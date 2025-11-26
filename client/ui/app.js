@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
     setupEventListeners();
     loadAPIs();
+    initializeQueryTab();
 });
 
 function initializeApp() {
@@ -96,6 +97,8 @@ function switchTab(tabName) {
         loadAPIsForResults();
     } else if (tabName === 'statistics') {
         loadStatistics();
+    } else if (tabName === 'query') {
+        renderChatMessages();
     }
 }
 
@@ -839,4 +842,328 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ============================================
+// Query/Chat Interface
+// ============================================
+
+let chatMessages = [];
+
+function initializeQueryTab() {
+    const sendBtn = document.getElementById('sendQueryBtn');
+    const queryInput = document.getElementById('queryInput');
+    const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendQuery);
+    }
+
+    if (queryInput) {
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuery();
+            }
+        });
+    }
+
+    suggestionBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            queryInput.value = btn.dataset.query;
+            sendQuery();
+        });
+    });
+
+    renderChatMessages();
+}
+
+async function sendQuery() {
+    const input = document.getElementById('queryInput');
+    const query = input.value.trim();
+
+    if (!query) {
+        showToast('Please enter a question', 'error');
+        return;
+    }
+
+    // Add user message
+    addChatMessage('user', query);
+    input.value = '';
+
+    // Show typing indicator
+    showTyping();
+
+    try {
+        // Process query with AI
+        const response = await processQuery(query);
+
+        // Remove typing indicator
+        hideTyping();
+
+        // Add assistant response
+        addChatMessage('assistant', response);
+    } catch (error) {
+        hideTyping();
+        addChatMessage('system', `Error: ${error.message}`);
+        showToast('Error processing query: ' + error.message, 'error');
+    }
+}
+
+async function processQuery(query) {
+    // Parse the query to determine intent
+    const queryLower = query.toLowerCase();
+
+    // Intent: List all APIs
+    if (queryLower.includes('list') && (queryLower.includes('api') || queryLower.includes('all'))) {
+        const apis = await fetch(`${API_BASE}/list`).then(r => r.json());
+        return formatAPIList(apis);
+    }
+
+    // Intent: Query API with summary (Tool 1: query-api-with-summary)
+    const queryMatch = query.match(/query\s+api\s+(\d+)/i);
+    if (queryMatch) {
+        const apiId = parseInt(queryMatch[1]);
+        const response = await fetch(`${API_BASE}/query/${apiId}/with-summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ params: {}, headers: {} })
+        });
+        const result = await response.json();
+        return formatQueryWithSummary(result);
+    }
+
+    // Intent: Validate and execute API (Tool 2: validate-and-execute-api)
+    const validateMatch = query.match(/validate\s+(?:and\s+)?(?:execute\s+)?api\s+(\d+)/i);
+    if (validateMatch) {
+        const apiId = parseInt(validateMatch[1]);
+        const response = await fetch(`${API_BASE}/validate/${apiId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ params: {}, headers: {} })
+        });
+        const result = await response.json();
+        return formatValidationResult(result);
+    }
+
+    // Intent: Show metadata
+    const metadataMatch = query.match(/(?:show|get|fetch)\s+metadata\s+(?:for\s+)?(?:api\s+)?(\d+|all)/i);
+    if (metadataMatch) {
+        const target = metadataMatch[1];
+        if (target === 'all') {
+            const metadata = await fetch(`${API_BASE}/metadata`).then(r => r.json());
+            return formatAllMetadata(metadata);
+        } else {
+            const apiId = parseInt(target);
+            const metadata = await fetch(`${API_BASE}/metadata/${apiId}`).then(r => r.json());
+            return formatAPIMetadata(metadata);
+        }
+    }
+
+    // Intent: Get API details
+    const apiMatch = query.match(/(?:show|get|details)\s+(?:of\s+)?api\s+(\d+)/i);
+    if (apiMatch) {
+        const apiId = parseInt(apiMatch[1]);
+        const api = await fetch(`${API_BASE}/get/${apiId}`).then(r => r.json());
+        return formatAPIDetails(api);
+    }
+
+    // Default: Use AI to interpret the query
+    return await processWithAI(query);
+}
+
+async function processWithAI(query) {
+    // Send to a generic endpoint that uses AI to interpret the query
+    const response = await fetch(`${API_BASE}/ai-query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+    });
+
+    if (!response.ok) {
+        throw new Error('AI query processing failed');
+    }
+
+    const result = await response.json();
+    return result.response || 'I processed your query but got no response.';
+}
+
+function formatAPIList(data) {
+    if (!data.success || !data.apis || data.apis.length === 0) {
+        return 'No APIs found.';
+    }
+
+    let response = `Found ${data.apis.length} registered API(s):\n\n`;
+    data.apis.forEach((api, i) => {
+        response += `${i + 1}. **${api.name}** (ID: ${api.id})\n`;
+        response += `   - Method: ${api.method}\n`;
+        response += `   - Endpoint: ${api.endpoint}\n`;
+        response += `   - Status: ${api.status}\n\n`;
+    });
+    return response;
+}
+
+function formatQueryWithSummary(data) {
+    if (!data.success) {
+        return `Error: ${data.message || 'Query failed'}`;
+    }
+
+    let response = `**API Query Result**\n\n`;
+    response += `API: ${data.api_name}\n`;
+    response += `Endpoint: ${data.endpoint}\n`;
+    response += `Method: ${data.method}\n\n`;
+    response += `**Response:**\n`;
+    response += `Status: ${data.response.status}\n`;
+    response += `Response Time: ${data.response.response_time}ms\n\n`;
+    response += `**AI Summary:**\n${data.ai_summary}\n\n`;
+    response += `**Response Data:**\n\`\`\`json\n${JSON.stringify(data.response.body, null, 2)}\n\`\`\``;
+    return response;
+}
+
+function formatValidationResult(data) {
+    if (!data.success) {
+        return `Validation Error: ${data.error || 'Unknown error'}`;
+    }
+
+    let response = `**API Validation & Execution Result**\n\n`;
+    response += `**Validation:**\n`;
+    response += `Method: ${data.validation.method}\n`;
+
+    if (data.validation.warnings && data.validation.warnings.length > 0) {
+        response += `\n⚠️ **Warnings:**\n`;
+        data.validation.warnings.forEach(w => {
+            response += `- ${w.message}\n`;
+            if (w.missing) {
+                response += `  Missing: ${w.missing.join(', ')}\n`;
+            }
+        });
+    } else {
+        response += `✅ No validation warnings\n`;
+    }
+
+    response += `\n**Execution:**\n`;
+    response += `Status: ${data.execution.status}\n`;
+    response += `Response Time: ${data.execution.response_time}ms\n`;
+    response += `Success: ${data.execution.success ? 'Yes' : 'No'}\n\n`;
+    response += `**Response Data:**\n\`\`\`json\n${JSON.stringify(data.execution.body, null, 2)}\n\`\`\``;
+    return response;
+}
+
+function formatAPIMetadata(data) {
+    if (!data.success || !data.metadata || data.metadata.length === 0) {
+        return 'No metadata found for this API.';
+    }
+
+    const latest = data.metadata[0];
+    let response = `**API Metadata (Latest)**\n\n`;
+    response += `**Summary:** ${latest.ai_summary}\n\n`;
+
+    if (latest.ai_recommendations) {
+        const rec = latest.ai_recommendations;
+        response += `**Requirements:**\n`;
+        response += `- Authorization Required: ${rec.authorization_required ? 'Yes' : 'No'}\n`;
+        if (rec.authorization_required) {
+            response += `- Auth Type: ${rec.auth_type}\n`;
+            response += `- Required Headers: ${rec.required_headers?.join(', ') || 'None'}\n`;
+        }
+    }
+
+    response += `\n**Risk Assessment:** ${latest.risk_assessment}\n`;
+    response += `**Performance Notes:** ${latest.performance_notes}\n`;
+    response += `**Model Used:** ${latest.model_used}\n`;
+    return response;
+}
+
+function formatAllMetadata(data) {
+    if (!data.success || !data.metadata || data.metadata.length === 0) {
+        return 'No metadata available.';
+    }
+
+    let response = `**All API Metadata (${data.total} total)**\n\n`;
+    data.metadata.forEach((item, i) => {
+        response += `${i + 1}. **API ID ${item.api_id}**\n`;
+        if (item.ai_summary) {
+            response += `   Summary: ${item.ai_summary.substring(0, 100)}...\n`;
+        }
+        response += `\n`;
+    });
+    return response;
+}
+
+function formatAPIDetails(data) {
+    if (!data.api) {
+        return 'API not found.';
+    }
+
+    const api = data.api;
+    let response = `**API Details**\n\n`;
+    response += `Name: ${api.name}\n`;
+    response += `ID: ${api.id}\n`;
+    response += `Endpoint: ${api.endpoint}\n`;
+    response += `Method: ${api.method}\n`;
+    response += `Status: ${api.status}\n`;
+    response += `Content Type: ${api.request_type}\n`;
+    response += `Description: ${api.description || 'No description'}\n`;
+    response += `Created: ${new Date(api.created_at).toLocaleString()}\n`;
+    return response;
+}
+
+function addChatMessage(role, content) {
+    chatMessages.push({ role, content, timestamp: new Date() });
+    renderChatMessages();
+
+    // Scroll to bottom
+    const chatContainer = document.getElementById('chatMessages');
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+}
+
+function renderChatMessages() {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    if (chatMessages.length === 0) {
+        container.innerHTML = `
+            <div class="chat-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <p>Start a conversation by asking a question above</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = chatMessages.map(msg => {
+        const roleLabel = msg.role === 'user' ? 'You' : (msg.role === 'assistant' ? 'AI Assistant' : 'System');
+        const formattedContent = msg.content.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        return `
+            <div class="chat-message ${msg.role}">
+                <div class="chat-message-header">${roleLabel}</div>
+                <div class="chat-message-content">${formattedContent}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function showTyping() {
+    const container = document.getElementById('chatMessages');
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'typingIndicator';
+    typingDiv.className = 'chat-typing';
+    typingDiv.innerHTML = `
+        <span>AI is thinking</span>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+    `;
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+function hideTyping() {
+    const typing = document.getElementById('typingIndicator');
+    if (typing) typing.remove();
 }

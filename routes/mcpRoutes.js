@@ -532,4 +532,286 @@ router.get("/metadata/:id", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/metadata
+ * Get all API metadata
+ */
+router.get("/metadata", async (req, res) => {
+  try {
+    const allApis = await apiService.getAllAPIs({});
+    const allMetadata = await Promise.all(
+      allApis.map(async (api) => {
+        const metadata = await apiService.getAIMetadata(api.id, 1);
+        return {
+          api_id: api.id,
+          api_name: api.name,
+          endpoint: api.endpoint,
+          metadata: metadata[0] || null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      total: allMetadata.length,
+      metadata: allMetadata
+    });
+  } catch (error) {
+    console.error('Error fetching all metadata:', error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message
+    });
+  }
+});
+
+// ============================================
+// Chat/Query Interface Routes
+// ============================================
+
+/**
+ * POST /api/query/:id/with-summary
+ * Execute API call and return response with AI summary
+ */
+router.post("/query/:id/with-summary", async (req, res) => {
+  try {
+    const apiId = parseInt(req.params.id);
+    const { params = {}, headers = {} } = req.body;
+
+    console.log(`🔍 Querying API ${apiId} with summary`);
+
+    const api = await apiService.getAPIById(apiId);
+    if (!api) {
+      return res.status(404).json({
+        error: "Not Found",
+        message: `API with ID ${apiId} not found`
+      });
+    }
+
+    // Execute API call
+    const testResult = await apiTester.executeAPICall(api, {
+      params: params || api.request_params || {},
+      headers: headers || {}
+    });
+
+    // Generate AI summary
+    const summaryPrompt = `Analyze this API response and provide a concise summary:
+
+API: ${api.name} (${api.method} ${api.endpoint})
+Status: ${testResult.status}
+Response Time: ${testResult.response_time}ms
+
+Response Data:
+${JSON.stringify(testResult.body, null, 2)}
+
+Provide:
+1. Brief summary of what the API returned
+2. Key data points
+3. Any notable patterns or insights
+4. Potential issues or recommendations`;
+
+    const aiResponse = await multiModelService.generateCompletion('default', summaryPrompt, {
+      temperature: 0.3,
+      maxTokens: 500
+    });
+
+    res.json({
+      success: true,
+      api_id: apiId,
+      api_name: api.name,
+      endpoint: api.endpoint,
+      method: api.method,
+      response: {
+        status: testResult.status,
+        response_time: testResult.response_time,
+        body: testResult.body
+      },
+      ai_summary: aiResponse.content || aiResponse,
+      model_used: aiResponse.provider || 'default'
+    });
+  } catch (error) {
+    console.error('Error in query with summary:', error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/validate/:id
+ * Validate request parameters and execute API call
+ */
+router.post("/validate/:id", async (req, res) => {
+  try {
+    const apiId = parseInt(req.params.id);
+    const { params = {}, headers = {}, method } = req.body;
+
+    console.log(`✅ Validating and executing API ${apiId}`);
+
+    const api = await apiService.getAPIById(apiId);
+    if (!api) {
+      return res.status(404).json({
+        error: "Not Found",
+        message: `API with ID ${apiId} not found`
+      });
+    }
+
+    // Validate HTTP method
+    const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+    const requestMethod = method || api.method;
+    if (!validMethods.includes(requestMethod)) {
+      return res.status(400).json({
+        error: "Invalid HTTP method",
+        provided: requestMethod,
+        allowed: validMethods
+      });
+    }
+
+    // Validate method matches registered API
+    if (method && method !== api.method) {
+      return res.status(400).json({
+        error: "Method mismatch",
+        registered: api.method,
+        provided: method,
+        message: "Provided method does not match registered API method"
+      });
+    }
+
+    // Fetch latest metadata for validation
+    const metadata = await apiService.getAIMetadata(apiId, 1);
+    let validationWarnings = [];
+
+    if (metadata && metadata.length > 0) {
+      const latestMetadata = metadata[0];
+      const recommendations = latestMetadata.ai_recommendations || {};
+
+      // Check auth requirements
+      if (recommendations.authorization_required && (!headers || !headers.Authorization)) {
+        validationWarnings.push({
+          type: 'auth_missing',
+          message: 'This API requires authorization but no Authorization header provided',
+          auth_type: recommendations.auth_type || 'Unknown'
+        });
+      }
+
+      // Check required headers
+      if (recommendations.required_headers && recommendations.required_headers.length > 0) {
+        const missingHeaders = recommendations.required_headers.filter(
+          h => !headers || !headers[h]
+        );
+        if (missingHeaders.length > 0) {
+          validationWarnings.push({
+            type: 'missing_headers',
+            message: 'Missing recommended headers',
+            missing: missingHeaders
+          });
+        }
+      }
+
+      // Check required params
+      if (recommendations.required_params && recommendations.required_params.length > 0) {
+        const missingParams = recommendations.required_params.filter(
+          p => !params || !params[p]
+        );
+        if (missingParams.length > 0) {
+          validationWarnings.push({
+            type: 'missing_params',
+            message: 'Missing recommended parameters',
+            missing: missingParams
+          });
+        }
+      }
+    }
+
+    // Execute API call
+    const testResult = await apiTester.executeAPICall(api, {
+      params: params || api.request_params || {},
+      headers: headers || {}
+    });
+
+    // Store test result
+    await apiService.storeTestResult({
+      api_id: apiId,
+      scenario_name: 'validated_execution',
+      response_status: testResult.status,
+      response_time: testResult.response_time,
+      response_body: testResult.body,
+      request_params: params || api.request_params || {},
+      request_headers: headers || {},
+      success: testResult.success,
+      error_message: testResult.error || null
+    });
+
+    res.json({
+      success: true,
+      validation: {
+        method: 'valid',
+        warnings: validationWarnings
+      },
+      execution: {
+        status: testResult.status,
+        response_time: testResult.response_time,
+        success: testResult.success,
+        body: testResult.body
+      },
+      metadata_used: metadata && metadata.length > 0
+    });
+  } catch (error) {
+    console.error('Error in validate and execute:', error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/ai-query
+ * Generic AI query processing
+ */
+router.post("/ai-query", async (req, res) => {
+  try {
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "Query parameter is required"
+      });
+    }
+
+    console.log(`💬 Processing AI query: ${query.substring(0, 50)}...`);
+
+    // Fetch context (all APIs for reference)
+    const allApis = await apiService.getAllAPIs({ limit: 10 });
+
+    // Build context for AI
+    const context = `Available APIs in the system:
+${allApis.map((api, i) => `${i + 1}. ${api.name} (ID: ${api.id}) - ${api.method} ${api.endpoint}`).join('\n')}
+
+User Query: ${query}
+
+Please provide a helpful response based on the available APIs and the user's question. If the query is asking about a specific API, provide detailed information. If it's a general question, provide helpful guidance.`;
+
+    const aiResponse = await multiModelService.generateCompletion('default', context, {
+      temperature: 0.7,
+      maxTokens: 600
+    });
+
+    res.json({
+      success: true,
+      query,
+      response: aiResponse.content || aiResponse,
+      model_used: aiResponse.provider || 'default'
+    });
+  } catch (error) {
+    console.error('Error in AI query:', error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message
+    });
+  }
+});
+
 export default router;

@@ -287,3 +287,19 @@ export async function batchTestAPIs(apiIds, scenarios = []) {
     results
   };
 }
+
+/**
+ * Execute a single API call (for query/validation endpoints)
+ * @param {Object} api - API object from database
+ * @param {Object} options - { params, headers }
+ * @returns {Promise<Object>} - { success, status, response_time, body, headers, error }
+ */
+export async function executeAPICall(api, options = {}) {
+  const scenario = {
+    name: 'single_execution',
+    params: options.params || {},
+    headers: options.headers || {}
+  };
+
+  return await runTestScenario(api, scenario);
+}

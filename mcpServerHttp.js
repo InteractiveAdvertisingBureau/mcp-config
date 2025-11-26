@@ -146,6 +146,55 @@ function createMCPServer() {
           properties: { api_id: { type: 'integer' } },
           required: ['api_id']
         }
+      },
+      {
+        name: 'query-api-with-summary',
+        description: 'Execute an API call and return response with AI-generated summary and analysis',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            api_id: {
+              type: 'integer',
+              description: 'ID of the registered API to query'
+            },
+            params: {
+              type: 'object',
+              description: 'Request parameters for the API call'
+            },
+            headers: {
+              type: 'object',
+              description: 'Custom headers for the API call'
+            }
+          },
+          required: ['api_id']
+        }
+      },
+      {
+        name: 'validate-and-execute-api',
+        description: 'Validate request parameters, HTTP method, and execute API call with full validation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            api_id: {
+              type: 'integer',
+              description: 'ID of the registered API'
+            },
+            params: {
+              type: 'object',
+              description: 'Parameters to validate and use in request'
+            },
+            method: {
+              type: 'string',
+              description: 'HTTP method to validate (GET, POST, PUT, DELETE, PATCH)',
+              enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+            },
+            headers: {
+              type: 'object',
+              description: 'Headers to validate and include'
+            }
+          },
+          required: ['api_id']
+        }
       }
     ]
   }));
@@ -243,6 +292,200 @@ function createMCPServer() {
             }]
           };
 
+        case 'query-api-with-summary': {
+          console.log(`🔍 [MCP] Querying API ${args.api_id} with summary`);
+          const api = await apiService.getAPIById(args.api_id);
+          if (!api) {
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({ error: 'API not found' }, null, 2)
+              }],
+              isError: true
+            };
+          }
+
+          // Execute API call
+          const testResult = await apiTester.executeAPICall(api, {
+            params: args.params || api.request_params || {},
+            headers: args.headers || {}
+          });
+
+          // Generate AI summary
+          const summaryPrompt = `Analyze this API response and provide a concise summary:
+
+API: ${api.name} (${api.method} ${api.endpoint})
+Status: ${testResult.status}
+Response Time: ${testResult.response_time}ms
+
+Response Data:
+${JSON.stringify(testResult.body, null, 2)}
+
+Provide:
+1. Brief summary of what the API returned
+2. Key data points
+3. Any notable patterns or insights
+4. Potential issues or recommendations`;
+
+          const aiResponse = await multiModelService.generateCompletion('default', summaryPrompt, {
+            temperature: 0.3,
+            maxTokens: 500
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                api_id: args.api_id,
+                api_name: api.name,
+                endpoint: api.endpoint,
+                method: api.method,
+                response: {
+                  status: testResult.status,
+                  response_time: testResult.response_time,
+                  body: testResult.body
+                },
+                ai_summary: aiResponse.content || aiResponse,
+                model_used: aiResponse.provider || 'default'
+              }, null, 2)
+            }]
+          };
+        }
+
+        case 'validate-and-execute-api': {
+          console.log(`✅ [MCP] Validating and executing API ${args.api_id}`);
+          const api = await apiService.getAPIById(args.api_id);
+          if (!api) {
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({ error: 'API not found' }, null, 2)
+              }],
+              isError: true
+            };
+          }
+
+          // Validate HTTP method
+          const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+          const requestMethod = args.method || api.method;
+          if (!validMethods.includes(requestMethod)) {
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Invalid HTTP method',
+                  provided: requestMethod,
+                  allowed: validMethods
+                }, null, 2)
+              }],
+              isError: true
+            };
+          }
+
+          // Validate method matches registered API
+          if (args.method && args.method !== api.method) {
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Method mismatch',
+                  registered: api.method,
+                  provided: args.method,
+                  message: 'Provided method does not match registered API method'
+                }, null, 2)
+              }],
+              isError: true
+            };
+          }
+
+          // Fetch latest metadata for validation
+          const metadata = await apiService.getAIMetadata(args.api_id, 1);
+          let validationWarnings = [];
+
+          if (metadata && metadata.length > 0) {
+            const latestMetadata = metadata[0];
+            const recommendations = latestMetadata.ai_recommendations || {};
+
+            // Check auth requirements
+            if (recommendations.authorization_required &&
+                (!args.headers || !args.headers.Authorization)) {
+              validationWarnings.push({
+                type: 'auth_missing',
+                message: 'This API requires authorization but no Authorization header provided',
+                auth_type: recommendations.auth_type || 'Unknown'
+              });
+            }
+
+            // Check required headers
+            if (recommendations.required_headers && recommendations.required_headers.length > 0) {
+              const missingHeaders = recommendations.required_headers.filter(
+                h => !args.headers || !args.headers[h]
+              );
+              if (missingHeaders.length > 0) {
+                validationWarnings.push({
+                  type: 'missing_headers',
+                  message: 'Missing recommended headers',
+                  missing: missingHeaders
+                });
+              }
+            }
+
+            // Check required params
+            if (recommendations.required_params && recommendations.required_params.length > 0) {
+              const missingParams = recommendations.required_params.filter(
+                p => !args.params || !args.params[p]
+              );
+              if (missingParams.length > 0) {
+                validationWarnings.push({
+                  type: 'missing_params',
+                  message: 'Missing recommended parameters',
+                  missing: missingParams
+                });
+              }
+            }
+          }
+
+          // Execute API call
+          const testResult = await apiTester.executeAPICall(api, {
+            params: args.params || api.request_params || {},
+            headers: args.headers || {}
+          });
+
+          // Store test result
+          await apiService.storeTestResult({
+            api_id: args.api_id,
+            scenario_name: 'validated_execution',
+            response_status: testResult.status,
+            response_time: testResult.response_time,
+            response_body: testResult.body,
+            request_params: args.params || api.request_params || {},
+            request_headers: args.headers || {},
+            success: testResult.success,
+            error_message: testResult.error || null
+          });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                validation: {
+                  method: 'valid',
+                  warnings: validationWarnings
+                },
+                execution: {
+                  status: testResult.status,
+                  response_time: testResult.response_time,
+                  success: testResult.success,
+                  body: testResult.body
+                },
+                metadata_used: metadata && metadata.length > 0
+              }, null, 2)
+            }]
+          };
+        }
+
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -270,6 +513,24 @@ function createMCPServer() {
         uri: 'api://statistics/{id}',
         name: 'API Statistics',
         description: 'Performance metrics',
+        mimeType: 'application/json'
+      },
+      {
+        uri: 'api://all-statistics',
+        name: 'All API Statistics',
+        description: 'View statistics for all registered APIs',
+        mimeType: 'application/json'
+      },
+      {
+        uri: 'api://metadata/{id}',
+        name: 'API Metadata',
+        description: 'Access AI-generated metadata and analysis for an API',
+        mimeType: 'application/json'
+      },
+      {
+        uri: 'api://all-metadata',
+        name: 'All API Metadata',
+        description: 'Browse all API metadata stored in database',
         mimeType: 'application/json'
       }
     ]
@@ -299,6 +560,51 @@ function createMCPServer() {
             uri,
             mimeType: 'application/json',
             text: JSON.stringify(stats || { error: 'Not found' }, null, 2)
+          }]
+        };
+      }
+
+      if (uri === 'api://all-statistics') {
+        const stats = await apiService.getAllAPIStatistics();
+        return {
+          contents: [{
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(stats, null, 2)
+          }]
+        };
+      }
+
+      if (uri.startsWith('api://metadata/')) {
+        const id = parseInt(uri.replace('api://metadata/', ''));
+        const metadata = await apiService.getAIMetadata(id, 10);
+        return {
+          contents: [{
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(metadata || [], null, 2)
+          }]
+        };
+      }
+
+      if (uri === 'api://all-metadata') {
+        const allApis = await apiService.getAllAPIs({});
+        const allMetadata = await Promise.all(
+          allApis.map(async (api) => {
+            const metadata = await apiService.getAIMetadata(api.id, 1);
+            return {
+              api_id: api.id,
+              api_name: api.name,
+              endpoint: api.endpoint,
+              metadata: metadata[0] || null
+            };
+          })
+        );
+        return {
+          contents: [{
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(allMetadata, null, 2)
           }]
         };
       }
