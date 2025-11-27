@@ -128,9 +128,44 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="apiParams">Request Parameters (JSON)</label>
-                                <textarea id="apiParams" rows="4" placeholder='{"key": "value"}'>{}</textarea>
-                                <small>Enter JSON object for request body or query parameters</small>
+                                <label>Request Parameters</label>
+                                <div id="parametersBuilder" style="margin-bottom: 1rem;">
+                                    <!-- Parameters will be added here dynamically -->
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="addParameterField()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Add Parameter
+                                </button>
+                                <small style="display: block; margin-top: 0.5rem;">Define parameters with their types and locations</small>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="apiRequiresAuth">Authentication Required?</label>
+                                    <select id="apiRequiresAuth" onchange="toggleAuthFields()">
+                                        <option value="false">No</option>
+                                        <option value="true">Yes</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="apiAuthType">Authentication Type</label>
+                                    <select id="apiAuthType" disabled>
+                                        <option value="Bearer Token">Bearer Token</option>
+                                        <option value="API Key">API Key</option>
+                                        <option value="Basic Auth">Basic Auth</option>
+                                        <option value="OAuth">OAuth</option>
+                                        <option value="Custom">Custom</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="authTokenGroup" style="display: none;">
+                                <label for="apiAuthToken">Authentication Token/Key (Optional)</label>
+                                <input type="text" id="apiAuthToken" placeholder="Enter your API key or token">
+                                <small>This will be used for testing. Leave empty to use placeholder.</small>
                             </div>
 
                             <div class="form-group">
@@ -214,7 +249,41 @@
                             </select>
                         </div>
 
+                        <!-- API Authentication Status -->
+                        <div id="apiAuthStatus" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                <div>
+                                    <strong>Authentication Required</strong>
+                                    <div id="authStatusText" style="font-size: 0.875rem; color: #666; margin-top: 0.25rem;"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="testScenarios" style="display: none;">
+                            <!-- Temporary Token Input (shown only when auth required) -->
+                            <div id="tempTokenContainer" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <label style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                        </svg>
+                                        Temporary Test Token
+                                    </label>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="clearTokenBtn" onclick="clearTempToken()">
+                                        Clear
+                                    </button>
+                                </div>
+                                <input type="text" id="tempTokenInput" placeholder="Enter authentication token for testing (saved locally)" style="width: 100%; padding: 0.625rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <small style="display: block; margin-top: 0.5rem; color: #666;">
+                                    This token is stored in your browser's localStorage and will be used for all tests until cleared.
+                                </small>
+                            </div>
+
                             <div class="section-header">
                                 <h3>Test Scenarios</h3>
                                 <button type="button" class="btn btn-secondary btn-sm" id="addScenarioBtn">

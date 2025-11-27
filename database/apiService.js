@@ -7,8 +7,8 @@ import { query, queryOne } from './connection.js';
 export async function registerAPI(apiData) {
   const sql = `
     INSERT INTO registered_apis
-    (name, endpoint, method, request_type, request_params, description, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    (name, endpoint, method, request_type, request_params, description, auth_required, auth_type, auth_token, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
@@ -18,6 +18,9 @@ export async function registerAPI(apiData) {
     apiData.request_type || 'application/json',
     JSON.stringify(apiData.request_params || {}),
     apiData.description || '',
+    apiData.auth_required || false,
+    apiData.auth_type || null,
+    apiData.auth_token || null,
     'active'
   ];
 
@@ -40,6 +43,9 @@ export async function getAPIById(apiId) {
       request_type,
       request_params,
       description,
+      auth_required,
+      auth_type,
+      auth_token,
       status,
       created_at,
       updated_at
@@ -73,6 +79,9 @@ export async function getAllAPIs(filters = {}) {
       request_type,
       request_params,
       description,
+      auth_required,
+      auth_type,
+      auth_token,
       status,
       created_at,
       updated_at

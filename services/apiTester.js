@@ -179,34 +179,83 @@ export async function testAPIPreview(apiData) {
 export function generateTestScenarios(api, metadata = null) {
   const scenarios = [];
 
-  // Extract auth requirements from metadata if available
-  const authRequired = metadata?.authorization_required || false;
-  const authType = metadata?.auth_type || 'Bearer Token';
+  // Check both API registration and learned metadata for auth requirements
+  // Priority: 1) API registration (user explicitly set), 2) Learned metadata (AI detected)
+  // Convert to boolean explicitly (MySQL returns 0/1 for BOOLEAN)
+  const authRequired = Boolean(api.auth_required) || metadata?.authorization_required || false;
+  const authType = api.auth_type || metadata?.auth_type || 'Bearer Token';
+  const authToken = api.auth_token; // Actual token from registration
   const requiredHeaders = metadata?.required_headers || [];
   const requiredParams = metadata?.required_params || [];
 
-  // Base headers
-  const baseHeaders = { 'Content-Type': api.request_type };
+  // Extract parameters from API definition
+  // Support both new format {body, query, path, headers} and old format (plain object)
+  let bodyParams = {};
+  let queryParams = {};
+  let customHeaders = {};
 
-  // If auth is required, include it in scenarios
-  const authHeaders = authRequired ? {
-    'Authorization': authType === 'API Key' ? 'YOUR_API_KEY_HERE' : 'Bearer YOUR_TOKEN_HERE'
-  } : {};
+  if (api.request_params) {
+    if (api.request_params.body || api.request_params.query || api.request_params.path || api.request_params.headers) {
+      // New format
+      bodyParams = api.request_params.body || {};
+      queryParams = api.request_params.query || {};
+      customHeaders = api.request_params.headers || {};
+      console.log(`📦 Using structured params - Body: ${Object.keys(bodyParams).length}, Query: ${Object.keys(queryParams).length}, Headers: ${Object.keys(customHeaders).length}`);
+    } else {
+      // Old format (backward compatible) - assume all params are body params
+      bodyParams = api.request_params;
+      console.log(`📦 Using legacy params format - ${Object.keys(bodyParams).length} body params`);
+    }
+  }
+
+  // Base headers
+  const baseHeaders = { 'Content-Type': api.request_type, ...customHeaders };
+
+  // Build auth headers with actual token or placeholder
+  let authHeaders = {};
+  if (authRequired) {
+    if (authToken) {
+      // Use actual token from registration
+      if (authType === 'API Key') {
+        authHeaders['X-API-Key'] = authToken;
+        authHeaders['Authorization'] = authToken; // Some APIs use Authorization for API keys
+      } else if (authType === 'Basic Auth') {
+        authHeaders['Authorization'] = `Basic ${authToken}`;
+      } else {
+        // Bearer Token or OAuth
+        authHeaders['Authorization'] = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+      }
+    } else {
+      // Use placeholder
+      if (authType === 'API Key') {
+        authHeaders['Authorization'] = 'YOUR_API_KEY_HERE';
+      } else if (authType === 'Basic Auth') {
+        authHeaders['Authorization'] = 'Basic YOUR_BASE64_CREDENTIALS_HERE';
+      } else {
+        authHeaders['Authorization'] = 'Bearer YOUR_TOKEN_HERE';
+      }
+    }
+  }
 
   // Add any other required headers from metadata
   requiredHeaders.forEach(header => {
-    if (header !== 'Authorization' && !authHeaders[header]) {
+    if (!authHeaders[header]) {
       authHeaders[header] = 'PLACEHOLDER_VALUE';
     }
   });
 
-  console.log(`🔧 Generating scenarios - Auth Required: ${authRequired}, Type: ${authType}`);
+  console.log(`🔧 Generating scenarios - Auth Required: ${authRequired}, Type: ${authType}, Token: ${authToken ? '✓ Provided' : '✗ Placeholder'}`);
+
+  // Determine which params to use based on method
+  // For GET/DELETE: use query params
+  // For POST/PUT/PATCH: use body params
+  const defaultParams = ['GET', 'DELETE'].includes(api.method) ? queryParams : bodyParams;
 
   // Scenario 1: Default/Happy path (with auth if required)
   scenarios.push({
     name: 'default',
     description: authRequired ? 'Default test with authentication' : 'Default parameters test',
-    params: api.request_params || {},
+    params: defaultParams,
     headers: { ...baseHeaders, ...authHeaders }
   });
 
@@ -216,7 +265,7 @@ export function generateTestScenarios(api, metadata = null) {
     scenarios.push({
       name: 'no_auth',
       description: 'Test without authentication (should fail)',
-      params: api.request_params || {},
+      params: defaultParams,
       headers: baseHeaders
     });
   }
@@ -258,6 +307,7 @@ export function generateTestScenarios(api, metadata = null) {
   }
 
   console.log(`✅ Generated ${scenarios.length} intelligent test scenarios`);
+  console.log('📋 First scenario headers:', JSON.stringify(scenarios[0]?.headers, null, 2));
   return scenarios;
 }
 

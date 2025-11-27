@@ -947,3 +947,171 @@ code {
         text-align: left;
     }
 }
+
+/* ============================================
+   Parameter Builder Styles
+   ============================================ */
+.parameter-row {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1fr 1.5fr 40px;
+    gap: 0.5rem;
+    align-items: end;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.parameter-row input,
+.parameter-row select {
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: white;
+}
+
+.parameter-row input:focus,
+.parameter-row select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.parameter-row label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.parameter-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.remove-param-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.remove-param-btn:hover {
+    background: #c82333;
+    transform: scale(1.05);
+}
+
+#parametersBuilder:empty::before {
+    content: 'No parameters defined. Click "Add Parameter" to add one.';
+    display: block;
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    background: #f8f9fa;
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .parameter-row {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .remove-param-btn {
+        width: 100%;
+        height: 36px;
+    }
+}
+
+/* ============================================
+   Scenario Parameter Input Styles
+   ============================================ */
+.params-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.param-input-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) 2fr;
+    gap: 1rem;
+    align-items: center;
+}
+
+.param-key {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.param-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.param-type-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    background: #4F46E5;
+    color: white;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.param-type-badge.header-badge {
+    background: #10B981;
+}
+
+.param-value {
+    width: 100%;
+    padding: 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: var(--transition);
+}
+
+.param-value:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.param-value::placeholder {
+    color: #9ca3af;
+}
+
+@media (max-width: 768px) {
+    .param-input-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .param-key {
+        flex-wrap: wrap;
+    }
+}

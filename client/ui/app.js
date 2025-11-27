@@ -56,6 +56,22 @@ function setupEventListeners() {
     document.getElementById('runTestBtn').addEventListener('click', runTests);
     document.getElementById('autoGenerateScenariosBtn').addEventListener('click', autoGenerateScenarios);
 
+    // Temporary token input - save on change with debounce
+    let tokenSaveTimeout;
+    document.getElementById('tempTokenInput').addEventListener('input', (e) => {
+        clearTimeout(tokenSaveTimeout);
+        tokenSaveTimeout = setTimeout(() => {
+            const apiId = document.getElementById('testApiSelect').value;
+            if (apiId) {
+                saveTempToken(apiId, e.target.value);
+                // Update scenarios with new token
+                if (currentScenarios.length > 0) {
+                    renderScenarios();
+                }
+            }
+        }, 500); // Save after 500ms of no typing
+    });
+
     // Results tab
     document.getElementById('resultsApiSelect').addEventListener('change', loadTestResults);
 
@@ -106,24 +122,171 @@ function switchTab(tabName) {
 // API Registration
 // ============================================
 
+// ============================================
+// Parameter Builder Functions
+// ============================================
+
+let parameterCounter = 0;
+
+function addParameterField() {
+    const container = document.getElementById('parametersBuilder');
+    const paramId = `param-${Date.now()}-${parameterCounter++}`;
+
+    const paramRow = document.createElement('div');
+    paramRow.className = 'parameter-row';
+    paramRow.id = paramId;
+    paramRow.innerHTML = `
+        <div class="parameter-field">
+            <label>Parameter Name</label>
+            <input type="text" class="param-name" placeholder="e.g., userId, email" required>
+        </div>
+        <div class="parameter-field">
+            <label>Location</label>
+            <select class="param-location">
+                <option value="body">Body (JSON)</option>
+                <option value="query">Query String</option>
+                <option value="path">Path Parameter</option>
+                <option value="header">Header</option>
+            </select>
+        </div>
+        <div class="parameter-field">
+            <label>Type</label>
+            <select class="param-type">
+                <option value="string">String</option>
+                <option value="number">Number</option>
+                <option value="boolean">Boolean</option>
+                <option value="object">Object</option>
+                <option value="array">Array</option>
+            </select>
+        </div>
+        <div class="parameter-field">
+            <label>Sample Value</label>
+            <input type="text" class="param-sample" placeholder="e.g., 123, test@email.com">
+        </div>
+        <button type="button" class="remove-param-btn" onclick="removeParameterField('${paramId}')" title="Remove parameter">
+            ×
+        </button>
+    `;
+
+    container.appendChild(paramRow);
+}
+
+function removeParameterField(paramId) {
+    const element = document.getElementById(paramId);
+    if (element) {
+        element.remove();
+    }
+}
+
+function collectParameters() {
+    const container = document.getElementById('parametersBuilder');
+    const paramRows = container.querySelectorAll('.parameter-row');
+
+    const parameters = {
+        body: {},
+        query: {},
+        path: {},
+        headers: {}
+    };
+
+    const metadata = [];
+
+    paramRows.forEach(row => {
+        const name = row.querySelector('.param-name').value.trim();
+        const location = row.querySelector('.param-location').value;
+        const type = row.querySelector('.param-type').value;
+        const sample = row.querySelector('.param-sample').value.trim();
+
+        if (!name) return; // Skip empty names
+
+        // Convert sample value based on type
+        let value = sample || getDefaultValue(type);
+        if (type === 'number') {
+            value = sample ? parseFloat(sample) : 0;
+        } else if (type === 'boolean') {
+            value = sample ? sample.toLowerCase() === 'true' : false;
+        } else if (type === 'object') {
+            try {
+                value = sample ? JSON.parse(sample) : {};
+            } catch (e) {
+                value = {};
+            }
+        } else if (type === 'array') {
+            try {
+                value = sample ? JSON.parse(sample) : [];
+            } catch (e) {
+                value = [];
+            }
+        }
+
+        // Store parameter in appropriate location
+        if (location === 'body') {
+            parameters.body[name] = value;
+        } else if (location === 'query') {
+            parameters.query[name] = value;
+        } else if (location === 'path') {
+            parameters.path[name] = value;
+        } else if (location === 'header') {
+            parameters.headers[name] = value;
+        }
+
+        // Store metadata
+        metadata.push({ name, location, type, sample: sample || value });
+    });
+
+    return { parameters, metadata };
+}
+
+function getDefaultValue(type) {
+    switch (type) {
+        case 'string': return '';
+        case 'number': return 0;
+        case 'boolean': return false;
+        case 'object': return {};
+        case 'array': return [];
+        default: return '';
+    }
+}
+
+function toggleAuthFields() {
+    const requiresAuth = document.getElementById('apiRequiresAuth').value === 'true';
+    const authTypeField = document.getElementById('apiAuthType');
+    const authTokenGroup = document.getElementById('authTokenGroup');
+
+    authTypeField.disabled = !requiresAuth;
+    authTokenGroup.style.display = requiresAuth ? 'block' : 'none';
+}
+
 async function handleRegisterAPI(e) {
     e.preventDefault();
+
+    const requiresAuth = document.getElementById('apiRequiresAuth').value === 'true';
+    const authType = document.getElementById('apiAuthType').value;
+    const authToken = document.getElementById('apiAuthToken').value;
+
+    // Collect parameters from builder
+    const { parameters, metadata } = collectParameters();
 
     const formData = {
         name: document.getElementById('apiName').value,
         endpoint: document.getElementById('apiEndpoint').value,
         method: document.getElementById('apiMethod').value,
         request_type: document.getElementById('apiRequestType').value,
-        description: document.getElementById('apiDescription').value
+        description: document.getElementById('apiDescription').value,
+        auth_required: requiresAuth,
+        auth_type: requiresAuth ? authType : null,
+        auth_token: requiresAuth && authToken ? authToken : null
     };
 
-    // Parse JSON params
-    try {
-        formData.request_params = JSON.parse(document.getElementById('apiParams').value || '{}');
-    } catch (error) {
-        showToast('Invalid JSON in request parameters', 'error');
-        return;
-    }
+    // Store all parameter locations (body, query, path, headers)
+    formData.request_params = {
+        body: parameters.body,
+        query: parameters.query,
+        path: parameters.path,
+        headers: parameters.headers
+    };
+
+    console.log('📋 Registering API with parameters:', formData.request_params);
 
     showLoading(true);
 
@@ -139,7 +302,9 @@ async function handleRegisterAPI(e) {
         if (result.success) {
             showToast('API registered successfully!', 'success');
             document.getElementById('registerForm').reset();
-            document.getElementById('apiParams').value = '{}';
+            // Clear parameter builder
+            document.getElementById('parametersBuilder').innerHTML = '';
+            parameterCounter = 0;
             loadAPIs();
             switchTab('apis');
         } else {
@@ -329,13 +494,75 @@ async function loadAPIsForTesting() {
 function handleTestAPISelect() {
     const apiId = document.getElementById('testApiSelect').value;
     const scenariosDiv = document.getElementById('testScenarios');
+    const authStatusDiv = document.getElementById('apiAuthStatus');
+    const authStatusText = document.getElementById('authStatusText');
+    const tempTokenContainer = document.getElementById('tempTokenContainer');
+    const tempTokenInput = document.getElementById('tempTokenInput');
 
     if (apiId) {
+        // Find the selected API
+        const selectedAPI = currentAPIs.find(api => api.id === parseInt(apiId));
+
+        // Show/hide auth status banner and temp token input
+        if (selectedAPI && selectedAPI.auth_required) {
+            const tokenStatus = selectedAPI.auth_token ? 'Token configured ✓' : 'No token provided (will use placeholder)';
+            authStatusText.textContent = `Type: ${selectedAPI.auth_type || 'Bearer Token'} | ${tokenStatus}`;
+            authStatusDiv.style.display = 'block';
+
+            // Show temporary token input
+            tempTokenContainer.style.display = 'block';
+
+            // Load saved token from localStorage for this API
+            const savedToken = getTempToken(apiId);
+            if (savedToken) {
+                tempTokenInput.value = savedToken;
+            } else {
+                tempTokenInput.value = '';
+            }
+        } else {
+            authStatusDiv.style.display = 'none';
+            tempTokenContainer.style.display = 'none';
+        }
+
         scenariosDiv.style.display = 'block';
         currentScenarios = [];
         addScenario(); // Add initial scenario
     } else {
         scenariosDiv.style.display = 'none';
+        authStatusDiv.style.display = 'none';
+        tempTokenContainer.style.display = 'none';
+    }
+}
+
+// Temporary Token Management (localStorage)
+function getTempToken(apiId) {
+    const key = `temp_token_api_${apiId}`;
+    return localStorage.getItem(key);
+}
+
+function saveTempToken(apiId, token) {
+    const key = `temp_token_api_${apiId}`;
+    if (token && token.trim()) {
+        localStorage.setItem(key, token.trim());
+        console.log(`💾 Saved temp token for API ${apiId}`);
+    } else {
+        localStorage.removeItem(key);
+    }
+}
+
+function clearTempToken() {
+    const apiId = document.getElementById('testApiSelect').value;
+    if (apiId) {
+        const key = `temp_token_api_${apiId}`;
+        localStorage.removeItem(key);
+        document.getElementById('tempTokenInput').value = '';
+        showToast('Temporary token cleared', 'success');
+        console.log(`🗑️ Cleared temp token for API ${apiId}`);
+
+        // Refresh scenarios to remove the token from headers
+        if (currentScenarios.length > 0) {
+            renderScenarios();
+        }
     }
 }
 
@@ -343,12 +570,38 @@ async function addScenario() {
     const apiId = document.getElementById('testApiSelect').value;
     const scenarioId = Date.now();
 
+    // Find the selected API to get its registered parameters
+    const selectedAPI = currentAPIs.find(api => api.id === parseInt(apiId));
+
+    // Extract parameters based on structure (new format or old format)
+    let bodyParams = {};
+    let queryParams = {};
+    let customHeaders = {};
+
+    if (selectedAPI?.request_params) {
+        if (selectedAPI.request_params.body || selectedAPI.request_params.query ||
+            selectedAPI.request_params.path || selectedAPI.request_params.headers) {
+            // New format
+            bodyParams = selectedAPI.request_params.body || {};
+            queryParams = selectedAPI.request_params.query || {};
+            customHeaders = selectedAPI.request_params.headers || {};
+        } else {
+            // Old format - assume body params
+            bodyParams = selectedAPI.request_params;
+        }
+    }
+
+    // Use appropriate params based on method
+    const defaultParams = ['GET', 'DELETE'].includes(selectedAPI?.method) ? queryParams : bodyParams;
+
     const newScenario = {
         id: scenarioId,
         name: `Scenario ${currentScenarios.length + 1}`,
-        params: {},
-        headers: { 'Content-Type': 'application/json' }
+        params: defaultParams,
+        headers: { 'Content-Type': 'application/json', ...customHeaders }
     };
+
+    console.log('➕ Adding scenario with registered params:', newScenario.params);
 
     // Try to fetch sample data for the new scenario
     if (apiId) {
@@ -359,15 +612,16 @@ async function addScenario() {
             if (sampleDataResult.success && sampleDataResult.sample_data) {
                 const sampleData = sampleDataResult.sample_data;
 
-                // Apply sample data to the new scenario
-                if (sampleData.authorization) {
+                // Apply sample data to the new scenario (merge with registered params)
+                if (sampleData.authorization && !newScenario.headers.Authorization) {
                     newScenario.headers.Authorization = sampleData.authorization;
                 }
                 if (sampleData.headers) {
                     newScenario.headers = { ...newScenario.headers, ...sampleData.headers };
                 }
                 if (sampleData.params) {
-                    newScenario.params = { ...sampleData.params };
+                    // Merge: keep registered params, add any additional sample params
+                    newScenario.params = { ...sampleData.params, ...newScenario.params };
                 }
             }
         } catch (error) {
@@ -381,36 +635,117 @@ async function addScenario() {
 
 function renderScenarios() {
     const container = document.getElementById('scenariosList');
-    container.innerHTML = currentScenarios.map((scenario, index) => `
-        <div class="scenario-item" data-id="${scenario.id}">
-            <div class="scenario-header">
-                <strong>Scenario ${index + 1}</strong>
-                <div>
-                    <button class="btn btn-secondary btn-sm" onclick="fillSampleData(${scenario.id})" title="Fill with AI sample data">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                            <path d="M2 17l10 5 10-5"></path>
-                            <path d="M2 12l10 5 10-5"></path>
-                        </svg>
-                        AI Fill
-                    </button>
-                    <button class="btn btn-secondary btn-sm" onclick="removeScenario(${scenario.id})" style="margin-left: 0.5rem;">Remove</button>
+
+    container.innerHTML = currentScenarios.map((scenario, index) => {
+        const apiId = document.getElementById('testApiSelect').value;
+        const selectedAPI = currentAPIs.find(api => api.id === parseInt(apiId));
+
+        // Determine parameter location based on HTTP method
+        const paramLocation = selectedAPI && ['GET', 'DELETE'].includes(selectedAPI.method) ? 'Query' : 'Body';
+
+        // Apply temporary token if available and API requires auth
+        const tempToken = getTempToken(apiId);
+        if (tempToken && selectedAPI && selectedAPI.auth_required) {
+            // Apply temp token to Authorization header (overrides any existing token)
+            const authType = selectedAPI.auth_type || 'Bearer Token';
+            if (authType === 'API Key') {
+                scenario.headers['Authorization'] = tempToken;
+                scenario.headers['X-API-Key'] = tempToken;
+            } else if (authType === 'Basic Auth') {
+                scenario.headers['Authorization'] = tempToken.startsWith('Basic ') ? tempToken : `Basic ${tempToken}`;
+            } else {
+                // Bearer Token or OAuth
+                scenario.headers['Authorization'] = tempToken.startsWith('Bearer ') ? tempToken : `Bearer ${tempToken}`;
+            }
+            console.log(`🔑 Applied temp token to scenario ${index + 1}`);
+        }
+
+        // Build parameter inputs
+        const paramInputs = Object.entries(scenario.params || {}).map(([key, value]) => `
+            <div class="param-input-row">
+                <div class="param-key">
+                    <span class="param-type-badge">${paramLocation}</span>
+                    <span class="param-name">${key}</span>
                 </div>
+                <input
+                    type="text"
+                    class="param-value"
+                    value="${escapeHtml(String(value))}"
+                    onchange="updateScenarioParamValue(${scenario.id}, '${escapeHtml(key)}', this.value)"
+                    placeholder="Enter ${key}">
             </div>
-            <div class="form-group">
-                <label>Scenario Name</label>
-                <input type="text" value="${scenario.name}" onchange="updateScenarioName(${scenario.id}, this.value)">
+        `).join('');
+
+        // Build header inputs
+        const headerInputs = Object.entries(scenario.headers || {}).map(([key, value]) => `
+            <div class="param-input-row">
+                <div class="param-key">
+                    <span class="param-type-badge header-badge">Header</span>
+                    <span class="param-name">${key}</span>
+                </div>
+                <input
+                    type="text"
+                    class="param-value"
+                    value="${escapeHtml(String(value))}"
+                    onchange="updateScenarioHeaderValue(${scenario.id}, '${escapeHtml(key)}', this.value)"
+                    placeholder="Enter ${key}">
             </div>
-            <div class="form-group">
-                <label>Parameters (JSON)</label>
-                <textarea rows="3" onchange="updateScenarioParams(${scenario.id}, this.value)">${JSON.stringify(scenario.params, null, 2)}</textarea>
+        `).join('');
+
+        return `
+            <div class="scenario-item" data-id="${scenario.id}">
+                <div class="scenario-header">
+                    <strong>Scenario ${index + 1}</strong>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="fillSampleData(${scenario.id})" title="Fill with AI sample data">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                <path d="M2 17l10 5 10-5"></path>
+                                <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                            AI Fill
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="removeScenario(${scenario.id})" style="margin-left: 0.5rem;">Remove</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Scenario Name</label>
+                    <input type="text" value="${scenario.name}" onchange="updateScenarioName(${scenario.id}, this.value)">
+                    ${scenario.description ? `<small style="color: #666; margin-top: 0.25rem; display: block;">${scenario.description}</small>` : ''}
+                </div>
+
+                ${paramInputs ? `
+                    <div class="form-group">
+                        <label style="margin-bottom: 0.75rem; display: block;">${paramLocation} Parameters</label>
+                        <div class="params-container">
+                            ${paramInputs}
+                        </div>
+                    </div>
+                ` : '<div class="form-group"><small style="color: #999;">No parameters defined</small></div>'}
+
+                ${headerInputs ? `
+                    <div class="form-group">
+                        <label style="margin-bottom: 0.75rem; display: block;">Headers</label>
+                        <div class="params-container">
+                            ${headerInputs}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
-            <div class="form-group">
-                <label>Headers (JSON)</label>
-                <textarea rows="2" onchange="updateScenarioHeaders(${scenario.id}, this.value)">${JSON.stringify(scenario.headers, null, 2)}</textarea>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
 }
 
 async function fillSampleData(scenarioId) {
@@ -469,26 +804,32 @@ function updateScenarioName(id, name) {
     if (scenario) scenario.name = name;
 }
 
-function updateScenarioParams(id, paramsStr) {
+function updateScenarioParamValue(id, key, value) {
     const scenario = currentScenarios.find(s => s.id === id);
     if (!scenario) return;
 
+    if (!scenario.params) scenario.params = {};
+
+    // Try to parse as JSON for numbers, booleans, objects, arrays
     try {
-        scenario.params = JSON.parse(paramsStr || '{}');
+        const parsed = JSON.parse(value);
+        scenario.params[key] = parsed;
     } catch (e) {
-        showToast('Invalid JSON in scenario parameters', 'error');
+        // If not valid JSON, treat as string
+        scenario.params[key] = value;
     }
+
+    console.log(`Updated param ${key} = ${value}`, scenario.params);
 }
 
-function updateScenarioHeaders(id, headersStr) {
+function updateScenarioHeaderValue(id, key, value) {
     const scenario = currentScenarios.find(s => s.id === id);
     if (!scenario) return;
 
-    try {
-        scenario.headers = JSON.parse(headersStr || '{}');
-    } catch (e) {
-        showToast('Invalid JSON in scenario headers', 'error');
-    }
+    if (!scenario.headers) scenario.headers = {};
+    scenario.headers[key] = value;
+
+    console.log(`Updated header ${key} = ${value}`, scenario.headers);
 }
 
 async function autoGenerateScenarios() {
@@ -525,6 +866,7 @@ async function autoGenerateScenarios() {
             const scenario = {
                 id: Date.now() + i,
                 name: s.name,
+                description: s.description,
                 params: s.params || {},
                 headers: s.headers || {}
             };
@@ -545,9 +887,9 @@ async function autoGenerateScenarios() {
                     });
                 }
 
-                // Merge sample params if params are empty
-                if (sampleData.params && Object.keys(scenario.params).length === 0) {
-                    scenario.params = { ...sampleData.params };
+                // Merge sample params with existing params (prefer scenario params, add missing from sample)
+                if (sampleData.params) {
+                    scenario.params = { ...sampleData.params, ...scenario.params };
                 }
             }
 
@@ -849,6 +1191,12 @@ function escapeHtml(text) {
 // ============================================
 
 let chatMessages = [];
+let conversationContext = {
+    currentAPI: null,        // Currently discussed API
+    lastAction: null,        // Last action performed
+    recentAPIs: [],          // Recently mentioned APIs
+    allAPIs: []              // Cached list of all APIs
+};
 
 function initializeQueryTab() {
     const sendBtn = document.getElementById('sendQueryBtn');
@@ -895,7 +1243,20 @@ async function sendQuery() {
     showTyping();
 
     try {
-        // Process query with AI
+        // Fetch all APIs if not cached
+        if (conversationContext.allAPIs.length === 0) {
+            try {
+                const apisResponse = await fetch(`${API_BASE}/apis`);
+                const apisData = await apisResponse.json();
+                if (apisData.success && apisData.apis) {
+                    conversationContext.allAPIs = apisData.apis;
+                }
+            } catch (e) {
+                console.warn('Could not fetch APIs for context:', e);
+            }
+        }
+
+        // Process query with AI and context
         const response = await processQuery(query);
 
         // Remove typing indicator
@@ -911,73 +1272,57 @@ async function sendQuery() {
 }
 
 async function processQuery(query) {
-    // Parse the query to determine intent
     const queryLower = query.toLowerCase();
 
+    // Check for explicit API ID first
+    const explicitApiMatch = query.match(/api\s+(\d+)/i);
+    if (explicitApiMatch) {
+        const apiId = parseInt(explicitApiMatch[1]);
+        conversationContext.currentAPI = apiId;
+        conversationContext.recentAPIs.unshift(apiId);
+        conversationContext.recentAPIs = [...new Set(conversationContext.recentAPIs)].slice(0, 5);
+    }
+
     // Intent: List all APIs
-    if (queryLower.includes('list') && (queryLower.includes('api') || queryLower.includes('all'))) {
-        const apis = await fetch(`${API_BASE}/list`).then(r => r.json());
+    if (queryLower.includes('list') || queryLower.includes('show all') || queryLower.includes('what apis')) {
+        const apis = await fetch(`${API_BASE}/apis`).then(r => r.json());
+        conversationContext.lastAction = 'list';
+        if (apis.success && apis.apis.length > 0) {
+            conversationContext.recentAPIs = apis.apis.slice(0, 5).map(a => a.id);
+        }
         return formatAPIList(apis);
     }
 
-    // Intent: Query API with summary (Tool 1: query-api-with-summary)
-    const queryMatch = query.match(/query\s+api\s+(\d+)/i);
-    if (queryMatch) {
-        const apiId = parseInt(queryMatch[1]);
-        const response = await fetch(`${API_BASE}/query/${apiId}/with-summary`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ params: {}, headers: {} })
-        });
-        const result = await response.json();
-        return formatQueryWithSummary(result);
-    }
-
-    // Intent: Validate and execute API (Tool 2: validate-and-execute-api)
-    const validateMatch = query.match(/validate\s+(?:and\s+)?(?:execute\s+)?api\s+(\d+)/i);
-    if (validateMatch) {
-        const apiId = parseInt(validateMatch[1]);
-        const response = await fetch(`${API_BASE}/validate/${apiId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ params: {}, headers: {} })
-        });
-        const result = await response.json();
-        return formatValidationResult(result);
-    }
-
-    // Intent: Show metadata
-    const metadataMatch = query.match(/(?:show|get|fetch)\s+metadata\s+(?:for\s+)?(?:api\s+)?(\d+|all)/i);
-    if (metadataMatch) {
-        const target = metadataMatch[1];
-        if (target === 'all') {
-            const metadata = await fetch(`${API_BASE}/metadata`).then(r => r.json());
-            return formatAllMetadata(metadata);
-        } else {
-            const apiId = parseInt(target);
-            const metadata = await fetch(`${API_BASE}/metadata/${apiId}`).then(r => r.json());
-            return formatAPIMetadata(metadata);
-        }
-    }
-
-    // Intent: Get API details
-    const apiMatch = query.match(/(?:show|get|details)\s+(?:of\s+)?api\s+(\d+)/i);
-    if (apiMatch) {
-        const apiId = parseInt(apiMatch[1]);
-        const api = await fetch(`${API_BASE}/get/${apiId}`).then(r => r.json());
-        return formatAPIDetails(api);
-    }
-
-    // Default: Use AI to interpret the query
+    // Use AI to resolve context and intent
     return await processWithAI(query);
 }
 
 async function processWithAI(query) {
-    // Send to a generic endpoint that uses AI to interpret the query
+    // Build conversation history for context
+    const conversationHistory = chatMessages.slice(-6).map(msg => ({
+        role: msg.role,
+        content: msg.content
+    }));
+
+    // Send context-aware query to backend
     const response = await fetch(`${API_BASE}/ai-query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({
+            query,
+            context: {
+                currentAPI: conversationContext.currentAPI,
+                lastAction: conversationContext.lastAction,
+                recentAPIs: conversationContext.recentAPIs,
+                conversationHistory
+            },
+            allAPIs: conversationContext.allAPIs.map(api => ({
+                id: api.id,
+                name: api.name,
+                endpoint: api.endpoint,
+                method: api.method
+            }))
+        })
     });
 
     if (!response.ok) {
@@ -985,6 +1330,33 @@ async function processWithAI(query) {
     }
 
     const result = await response.json();
+
+    // Update context based on AI response
+    if (result.context) {
+        if (result.context.currentAPI) {
+            conversationContext.currentAPI = result.context.currentAPI;
+        }
+        if (result.context.action) {
+            conversationContext.lastAction = result.context.action;
+        }
+        if (result.context.apiId) {
+            conversationContext.currentAPI = result.context.apiId;
+            conversationContext.recentAPIs.unshift(result.context.apiId);
+            conversationContext.recentAPIs = [...new Set(conversationContext.recentAPIs)].slice(0, 5);
+        }
+    }
+
+    // If AI performed an action, format accordingly
+    if (result.action === 'query_with_summary') {
+        return formatQueryWithSummary(result.data);
+    } else if (result.action === 'validate') {
+        return formatValidationResult(result.data);
+    } else if (result.action === 'get_api') {
+        return formatAPIDetails(result.data);
+    } else if (result.action === 'metadata') {
+        return formatAPIMetadata(result.data);
+    }
+
     return result.response || 'I processed your query but got no response.';
 }
 

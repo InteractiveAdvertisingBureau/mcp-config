@@ -24,7 +24,7 @@ router.get("/health", function (req, res) {
  */
 router.post("/register", async (req, res) => {
   try {
-    const { name, endpoint, method, request_type, request_params, description } = req.body;
+    const { name, endpoint, method, request_type, request_params, description, auth_required, auth_type, auth_token } = req.body;
 
     if (!endpoint) {
       return res.status(400).json({
@@ -34,6 +34,8 @@ router.post("/register", async (req, res) => {
     }
 
     console.log(`📝 Registering API: ${name || endpoint}`);
+    console.log(`🔐 Auth settings - Required: ${auth_required}, Type: ${auth_type}, Token: ${auth_token ? '✓ Provided' : '✗ Missing'}`);
+    console.log(`📋 Request params structure:`, JSON.stringify(request_params, null, 2));
 
     // Step 1: Enhance description with AI if provided or generate one
     let enhancedDescription = description;
@@ -61,7 +63,10 @@ router.post("/register", async (req, res) => {
       method,
       request_type,
       request_params,
-      description: enhancedDescription
+      description: enhancedDescription,
+      auth_required,
+      auth_type,
+      auth_token
     });
 
     console.log(`✅ API registered with ID: ${api.id}`);
@@ -282,6 +287,9 @@ router.get("/test/:id/scenarios", async (req, res) => {
   try {
     const apiId = parseInt(req.params.id);
     const api = await apiService.getAPIById(apiId);
+
+    console.log(`🔍 Fetching scenarios for API ${apiId}`);
+    console.log(`📋 API auth_required: ${api?.auth_required}, auth_type: ${api?.auth_type}, auth_token: ${api?.auth_token ? '✓ Present' : '✗ Missing'}`);
 
     if (!api) {
       return res.status(404).json({
@@ -768,11 +776,11 @@ router.post("/validate/:id", async (req, res) => {
 
 /**
  * POST /api/ai-query
- * Generic AI query processing
+ * Context-aware AI query processing
  */
 router.post("/ai-query", async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query, context = {}, allAPIs = [] } = req.body;
 
     if (!query) {
       return res.status(400).json({
@@ -781,30 +789,230 @@ router.post("/ai-query", async (req, res) => {
       });
     }
 
-    console.log(`💬 Processing AI query: ${query.substring(0, 50)}...`);
+    console.log(`💬 Processing context-aware query: ${query.substring(0, 50)}...`);
 
-    // Fetch context (all APIs for reference)
-    const allApis = await apiService.getAllAPIs({ limit: 10 });
+    // Fetch all APIs if not provided
+    const apis = allAPIs.length > 0 ? allAPIs : await apiService.getAllAPIs({ limit: 10 });
 
-    // Build context for AI
-    const context = `Available APIs in the system:
-${allApis.map((api, i) => `${i + 1}. ${api.name} (ID: ${api.id}) - ${api.method} ${api.endpoint}`).join('\n')}
+    // Build conversation context
+    let conversationHistory = '';
+    if (context.conversationHistory && context.conversationHistory.length > 0) {
+      conversationHistory = '\n\nRecent Conversation:\n' +
+        context.conversationHistory.map(msg => `${msg.role}: ${msg.content.substring(0, 100)}`).join('\n');
+    }
 
-User Query: ${query}
+    // Build current context info
+    let currentContext = '';
+    if (context.currentAPI) {
+      const currentApi = apis.find(a => a.id === context.currentAPI);
+      if (currentApi) {
+        currentContext = `\n\nCurrent API in context: ${currentApi.name} (ID: ${currentApi.id}) - ${currentApi.method} ${currentApi.endpoint}`;
+      }
+    }
+    if (context.lastAction) {
+      currentContext += `\nLast action: ${context.lastAction}`;
+    }
+    if (context.recentAPIs && context.recentAPIs.length > 0) {
+      const recentApiDetails = context.recentAPIs
+        .map(id => apis.find(a => a.id === id))
+        .filter(a => a)
+        .map((a, i) => `${i + 1}. ${a.name} (ID: ${a.id})`);
+      if (recentApiDetails.length > 0) {
+        currentContext += `\nRecently mentioned:\n${recentApiDetails.join('\n')}`;
+      }
+    }
 
-Please provide a helpful response based on the available APIs and the user's question. If the query is asking about a specific API, provide detailed information. If it's a general question, provide helpful guidance.`;
+    // Build AI prompt with instructions
+    const aiPrompt = `You are an AI assistant for API testing. Understand natural conversation and context references.
 
-    const aiResponse = await multiModelService.generateCompletion('default', context, {
+Available APIs:
+${apis.map((api, i) => `${i + 1}. ${api.name} (ID: ${api.id}) - ${api.method} ${api.endpoint}`).join('\n')}
+${currentContext}
+${conversationHistory}
+
+User: ${query}
+
+Resolve references like "it", "that one", "the first/second one", "the GitHub API" using context.
+
+If user wants to:
+- Test/query an API → Respond: ACTION: query_with_summary | API_ID: X | EXPLANATION: brief text
+- Validate an API → Respond: ACTION: validate | API_ID: X | EXPLANATION: brief text
+- Get API details → Respond: ACTION: get_api_details | API_ID: X | EXPLANATION: brief text
+- Get metadata → Respond: ACTION: get_metadata | API_ID: X | EXPLANATION: brief text
+- General question → Respond normally
+
+Response:`;
+
+    const aiResponse = await multiModelService.generateCompletion('default', aiPrompt, {
       temperature: 0.7,
-      maxTokens: 600
+      maxTokens: 800
     });
 
+    const content = aiResponse.content || aiResponse;
+
+    // Parse for actions
+    const actionMatch = content.match(/ACTION:\s*(\w+)/i);
+    const apiIdMatch = content.match(/API_ID:\s*(\d+)/i);
+    const explanationMatch = content.match(/EXPLANATION:\s*(.+?)(?:\n|$)/is);
+
+    if (actionMatch && apiIdMatch) {
+      const action = actionMatch[1].toLowerCase();
+      const apiId = parseInt(apiIdMatch[1]);
+      const explanation = explanationMatch ? explanationMatch[1].trim() : '';
+
+      console.log(`🎯 Action: ${action} for API ${apiId}`);
+
+      let actionResult, actionType;
+
+      try {
+        const api = await apiService.getAPIById(apiId);
+        if (!api) {
+          return res.json({
+            success: true,
+            response: `I couldn't find API with ID ${apiId}.`,
+            context: { currentAPI: context.currentAPI }
+          });
+        }
+
+        if (action === 'query_with_summary') {
+          // Build headers with auth if API requires it
+          const headers = {};
+          if (Boolean(api.auth_required) && api.auth_token) {
+            if (api.auth_type === 'API Key') {
+              headers['X-API-Key'] = api.auth_token;
+              headers['Authorization'] = api.auth_token;
+            } else if (api.auth_type === 'Basic Auth') {
+              headers['Authorization'] = `Basic ${api.auth_token}`;
+            } else {
+              headers['Authorization'] = api.auth_token.startsWith('Bearer ') ? api.auth_token : `Bearer ${api.auth_token}`;
+            }
+            console.log(`🔐 Using stored auth token for ${api.name}`);
+          }
+
+          const testResult = await apiTester.executeAPICall(api, { params: {}, headers });
+          const summaryPrompt = `Concise summary of API response:\nAPI: ${api.name}\nStatus: ${testResult.status}\nBody: ${JSON.stringify(testResult.body).substring(0, 500)}\n\nProvide brief analysis:`;
+          const summaryResponse = await multiModelService.generateCompletion('default', summaryPrompt, {
+            temperature: 0.3,
+            maxTokens: 400
+          });
+
+          actionResult = {
+            success: true,
+            api_id: apiId,
+            api_name: api.name,
+            endpoint: api.endpoint,
+            method: api.method,
+            auth_used: Boolean(api.auth_required) && api.auth_token ? true : false,
+            response: {
+              status: testResult.status,
+              response_time: testResult.response_time,
+              body: testResult.body
+            },
+            ai_summary: summaryResponse.content || summaryResponse
+          };
+          actionType = 'query_with_summary';
+
+        } else if (action === 'validate') {
+          const metadata = await apiService.getAIMetadata(apiId, 1);
+          let validationWarnings = [];
+          if (metadata && metadata.length > 0) {
+            const rec = metadata[0].ai_recommendations || {};
+            if (rec.authorization_required) {
+              validationWarnings.push({
+                type: 'auth_missing',
+                message: 'This API requires authorization',
+                auth_type: rec.auth_type || 'Unknown'
+              });
+            }
+          }
+
+          // Build headers with auth if API requires it
+          const headers = {};
+          if (Boolean(api.auth_required) && api.auth_token) {
+            if (api.auth_type === 'API Key') {
+              headers['X-API-Key'] = api.auth_token;
+              headers['Authorization'] = api.auth_token;
+            } else if (api.auth_type === 'Basic Auth') {
+              headers['Authorization'] = `Basic ${api.auth_token}`;
+            } else {
+              // Bearer Token or OAuth
+              headers['Authorization'] = api.auth_token.startsWith('Bearer ') ? api.auth_token : `Bearer ${api.auth_token}`;
+            }
+            console.log(`🔐 Using stored auth token for validation: ${api.name}`);
+          }
+
+          const testResult = await apiTester.executeAPICall(api, { params: {}, headers });
+          await apiService.storeTestResult({
+            api_id: apiId,
+            scenario_name: 'context_validation',
+            response_status: testResult.status,
+            response_time: testResult.response_time,
+            response_body: testResult.body,
+            request_params: {},
+            request_headers: headers,
+            success: testResult.success,
+            error_message: testResult.error || null
+          });
+
+          actionResult = {
+            success: true,
+            validation: { method: 'valid', warnings: validationWarnings },
+            execution: {
+              status: testResult.status,
+              response_time: testResult.response_time,
+              success: testResult.success,
+              body: testResult.body,
+              auth_used: Boolean(api.auth_required) && api.auth_token ? true : false
+            }
+          };
+          actionType = 'validate';
+
+        } else if (action === 'get_api_details') {
+          actionResult = { api };
+          actionType = 'get_api';
+
+        } else if (action === 'get_metadata') {
+          const metadata = await apiService.getAIMetadata(apiId, 5);
+          actionResult = { success: true, api_id: apiId, metadata };
+          actionType = 'metadata';
+        }
+
+        return res.json({
+          success: true,
+          query,
+          response: explanation || content,
+          action: actionType,
+          data: actionResult,
+          context: {
+            currentAPI: apiId,
+            apiId: apiId,
+            action: action
+          },
+          model_used: aiResponse.provider || 'default'
+        });
+
+      } catch (actionError) {
+        console.error(`Error ${action}:`, actionError);
+        return res.json({
+          success: true,
+          response: `I tried to ${action} but encountered an error: ${actionError.message}`,
+          context: { currentAPI: apiId }
+        });
+      }
+    }
+
+    // Conversational response
     res.json({
       success: true,
       query,
-      response: aiResponse.content || aiResponse,
+      response: content,
+      context: {
+        currentAPI: context.currentAPI,
+        lastAction: context.lastAction
+      },
       model_used: aiResponse.provider || 'default'
     });
+
   } catch (error) {
     console.error('Error in AI query:', error);
     res.status(500).json({
