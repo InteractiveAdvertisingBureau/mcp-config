@@ -52,12 +52,12 @@ class MultiModelService {
    * @param {object} options - Additional options (temperature, maxTokens, jsonMode)
    */
   async generateCompletion(provider = 'default', prompt, options = {}) {
-    console.log(`🔄 generateCompletion called - provider parameter: ${provider}`);
+    console.error(`🔄 generateCompletion called - provider parameter: ${provider}`);
 
     // Resolve default provider
     if (provider === 'default') {
       provider = modelConfig.defaults.analysis;
-      console.log(`⚙️  Resolved 'default' to: ${provider}`);
+      console.error(`⚙️  Resolved 'default' to: ${provider}`);
     }
 
     // Validate provider is enabled
@@ -71,7 +71,7 @@ class MultiModelService {
       jsonMode = false
     } = options;
 
-    console.log(`✅ Routing to provider: ${provider}`);
+    console.error(`✅ Routing to provider: ${provider}`);
 
     // Route to appropriate provider
     if (provider === 'openai') {
@@ -158,7 +158,7 @@ class MultiModelService {
    */
   async analyze(prompt, options = {}) {
     const provider = options.provider || modelConfig.defaults.analysis;
-    console.log(`🤖 MultiModelService.analyze - Using provider: ${provider} (received: ${options.provider || 'not specified'})`);
+    console.error(`🤖 MultiModelService.analyze - Using provider: ${provider} (received: ${options.provider || 'not specified'})`);
     return await this.generateCompletion(provider, prompt, { ...options, jsonMode: true });
   }
 }

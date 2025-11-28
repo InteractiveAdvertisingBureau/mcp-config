@@ -8,7 +8,7 @@ import { collectAPIMetadata, validateAPIResponse } from '../middleware/apiCollec
  */
 export async function testAPIWithScenarios(apiId, scenarios = []) {
   try {
-    console.log(`🧪 Testing API ID: ${apiId} with ${scenarios.length} scenarios`);
+    console.error(`🧪 Testing API ID: ${apiId} with ${scenarios.length} scenarios`);
 
     // Get API details from database
     const api = await apiService.getAPIById(apiId);
@@ -104,7 +104,7 @@ async function runTestScenario(api, scenario) {
       config.params = scenario.params || api.request_params;
     }
 
-    console.log(`🔍 Testing ${api.method} ${api.endpoint} (${scenario.name})`);
+    console.error(`🔍 Testing ${api.method} ${api.endpoint} (${scenario.name})`);
 
     // Execute request
     const response = await axios(config);
@@ -115,7 +115,7 @@ async function runTestScenario(api, scenario) {
     result.body = response.data;
     result.success = response.status >= 200 && response.status < 400;
 
-    console.log(`${result.success ? '✅' : '❌'} Test completed: ${response.status} (${result.response_time}ms)`);
+    console.error(`${result.success ? '✅' : '❌'} Test completed: ${response.status} (${result.response_time}ms)`);
 
   } catch (error) {
     result.response_time = Date.now() - startTime;
@@ -135,7 +135,7 @@ async function runTestScenario(api, scenario) {
       result.error = 'Request setup failed: ' + error.message;
     }
 
-    console.log(`❌ Test failed: ${result.error} (${result.response_time}ms)`);
+    console.error(`❌ Test failed: ${result.error} (${result.response_time}ms)`);
   }
 
   return result;
@@ -146,7 +146,7 @@ async function runTestScenario(api, scenario) {
  */
 export async function testAPIPreview(apiData) {
   try {
-    console.log(`👁️ Preview test for: ${apiData.endpoint}`);
+    console.error(`👁️ Preview test for: ${apiData.endpoint}`);
 
     const scenario = {
       name: 'preview',
@@ -200,11 +200,11 @@ export function generateTestScenarios(api, metadata = null) {
       bodyParams = api.request_params.body || {};
       queryParams = api.request_params.query || {};
       customHeaders = api.request_params.headers || {};
-      console.log(`📦 Using structured params - Body: ${Object.keys(bodyParams).length}, Query: ${Object.keys(queryParams).length}, Headers: ${Object.keys(customHeaders).length}`);
+      console.error(`📦 Using structured params - Body: ${Object.keys(bodyParams).length}, Query: ${Object.keys(queryParams).length}, Headers: ${Object.keys(customHeaders).length}`);
     } else {
       // Old format (backward compatible) - assume all params are body params
       bodyParams = api.request_params;
-      console.log(`📦 Using legacy params format - ${Object.keys(bodyParams).length} body params`);
+      console.error(`📦 Using legacy params format - ${Object.keys(bodyParams).length} body params`);
     }
   }
 
@@ -244,7 +244,7 @@ export function generateTestScenarios(api, metadata = null) {
     }
   });
 
-  console.log(`🔧 Generating scenarios - Auth Required: ${authRequired}, Type: ${authType}, Token: ${authToken ? '✓ Provided' : '✗ Placeholder'}`);
+  console.error(`🔧 Generating scenarios - Auth Required: ${authRequired}, Type: ${authType}, Token: ${authToken ? '✓ Provided' : '✗ Placeholder'}`);
 
   // Determine which params to use based on method
   // For GET/DELETE: use query params
@@ -306,8 +306,8 @@ export function generateTestScenarios(api, metadata = null) {
     });
   }
 
-  console.log(`✅ Generated ${scenarios.length} intelligent test scenarios`);
-  console.log('📋 First scenario headers:', JSON.stringify(scenarios[0]?.headers, null, 2));
+  console.error(`✅ Generated ${scenarios.length} intelligent test scenarios`);
+  console.error('📋 First scenario headers:', JSON.stringify(scenarios[0]?.headers, null, 2));
   return scenarios;
 }
 

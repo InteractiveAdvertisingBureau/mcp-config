@@ -4,11 +4,12 @@
     "description": "",
     "main": "app.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "node test-mcp-connection.js",
         "start": "node server.js",
         "mcp": "node mcpServer.js",
         "mcp:http": "node mcpServerHttp.js",
-        "dev": "node --watch server.js"
+        "dev": "node --watch server.js",
+        "test:mcp": "node test-mcp-connection.js"
     },
     "repository": {
         "type": "git",

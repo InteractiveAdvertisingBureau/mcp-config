@@ -288,22 +288,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'register-api': {
-        console.log(`📝 [MCP] Registering API: ${args.name || args.endpoint}`);
+        console.error(`📝 [MCP] Registering API: ${args.name || args.endpoint}`);
 
         // Register the API
         const api = await apiService.registerAPI(args);
-        console.log(`✅ [MCP] API registered with ID: ${api.id}`);
+        console.error(`✅ [MCP] API registered with ID: ${api.id}`);
 
         // Auto-generate and run test scenarios (async)
         const scenarios = apiTester.generateTestScenarios(api);
-        console.log(`🔧 [MCP] Auto-generated ${scenarios.length} test scenarios`);
+        console.error(`🔧 [MCP] Auto-generated ${scenarios.length} test scenarios`);
 
         // Run tests in background
         setImmediate(async () => {
           try {
-            console.log(`🧪 [MCP] Starting automatic test for API ${api.id}...`);
+            console.error(`🧪 [MCP] Starting automatic test for API ${api.id}...`);
             await apiTester.testAPIWithScenarios(api.id, scenarios);
-            console.log(`✅ [MCP] Automatic test completed for API ${api.id}`);
+            console.error(`✅ [MCP] Automatic test completed for API ${api.id}`);
           } catch (testError) {
             console.error(`❌ [MCP] Automatic test failed:`, testError.message);
           }
@@ -471,7 +471,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'query-api-with-summary': {
-        console.log(`🔍 [MCP] Querying API ${args.api_id} with summary`);
+        console.error(`🔍 [MCP] Querying API ${args.api_id} with summary`);
         const api = await apiService.getAPIById(args.api_id);
         if (!api) {
           return {
@@ -532,7 +532,7 @@ Provide:
       }
 
       case 'validate-and-execute-api': {
-        console.log(`✅ [MCP] Validating and executing API ${args.api_id}`);
+        console.error(`✅ [MCP] Validating and executing API ${args.api_id}`);
         const api = await apiService.getAPIById(args.api_id);
         if (!api) {
           return {

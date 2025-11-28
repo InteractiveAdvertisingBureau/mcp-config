@@ -1,8 +1,12 @@
 import { config } from 'dotenv';
 
+// Suppress dotenv stdout messages by temporarily hijacking console.log
+const originalLog = console.log;
+console.log = () => {};
 export const env = process.env.NODE_ENV || 'development';
 const envFile = `.env`;
 config({ path: envFile });
+console.log = originalLog;
 
 // Environment variable validation
 function validateEnvVar(name, value, required = false) {
@@ -48,14 +52,14 @@ export const jwtSecret = process.env.JWT_SECRET;
 
 // Log configuration status (only in development)
 if (env === 'development') {
-    console.log('Configuration loaded:');
-    console.log(`- Environment: ${env}`);
-    console.log(`- Port: ${port}`);
-    console.log(`- Models:`);
-    console.log(`  - OpenAI: ${modelConfig.openai.enabled ? `✓ ${modelConfig.openai.model}` : '✗ Not configured'}`);
-    console.log(`  - Gemini: ${modelConfig.gemini.enabled ? `✓ ${modelConfig.gemini.model}` : '✗ Not configured'}`);
-    console.log(`  - Default Analysis: ${modelConfig.defaults.analysis}`);
-    console.log(`  - Default Chat: ${modelConfig.defaults.chat}`);
-    // console.log(`- BigQuery Credentials: ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'configured' : 'NOT SET'}`);
+    console.error('Configuration loaded:');
+    console.error(`- Environment: ${env}`);
+    console.error(`- Port: ${port}`);
+    console.error(`- Models:`);
+    console.error(`  - OpenAI: ${modelConfig.openai.enabled ? `✓ ${modelConfig.openai.model}` : '✗ Not configured'}`);
+    console.error(`  - Gemini: ${modelConfig.gemini.enabled ? `✓ ${modelConfig.gemini.model}` : '✗ Not configured'}`);
+    console.error(`  - Default Analysis: ${modelConfig.defaults.analysis}`);
+    console.error(`  - Default Chat: ${modelConfig.defaults.chat}`);
+    // console.error(`- BigQuery Credentials: ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'configured' : 'NOT SET'}`);
 }
 

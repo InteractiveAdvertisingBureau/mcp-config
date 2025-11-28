@@ -9,7 +9,7 @@ import { multiModelService } from '../services/multiModelService.js';
  */
 export async function collectAPIMetadata(apiData, testResults) {
   try {
-    console.log(`📊 Collecting metadata for API: ${apiData.name || apiData.endpoint}`);
+    console.error(`📊 Collecting metadata for API: ${apiData.name || apiData.endpoint}`);
 
     // Generate AI summary of the API and test results
     const aiAnalysis = await generateAISummary(apiData, testResults);
@@ -32,7 +32,7 @@ export async function collectAPIMetadata(apiData, testResults) {
       model_used: aiAnalysis.model_used
     });
 
-    console.log(`✅ AI metadata stored with ID: ${metadataId}`);
+    console.error(`✅ AI metadata stored with ID: ${metadataId}`);
 
     return {
       metadata_id: metadataId,
@@ -181,7 +181,7 @@ export async function logAPIActivity(apiId, requestData, responseData, startTime
       error: responseData.error || null
     });
 
-    console.log(`📝 API activity logged for API ID: ${apiId} (${duration}ms)`);
+    console.error(`📝 API activity logged for API ID: ${apiId} (${duration}ms)`);
   } catch (error) {
     console.error('❌ Error logging API activity:', error.message);
     // Don't throw error - logging failure shouldn't break the flow

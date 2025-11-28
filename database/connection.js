@@ -8,7 +8,7 @@ let pool = null;
  */
 export function initializeDatabase() {
   if (pool) {
-    console.log('⚠️ Database pool already initialized');
+    console.error('⚠️ Database pool already initialized');
     return pool;
   }
 
@@ -27,10 +27,10 @@ export function initializeDatabase() {
 
   try {
     pool = mysql.createPool(config);
-    console.log('✅ MySQL connection pool created');
-    console.log(`   - Host: ${config.host}:${config.port}`);
-    console.log(`   - Database: ${config.database}`);
-    console.log(`   - User: ${config.user}`);
+    console.error('✅ MySQL connection pool created');
+    console.error(`   - Host: ${config.host}:${config.port}`);
+    console.error(`   - Database: ${config.database}`);
+    console.error(`   - User: ${config.user}`);
 
     // Test connection
     testConnection();
@@ -48,7 +48,7 @@ export function initializeDatabase() {
 async function testConnection() {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ Database connection test successful');
+    console.error('✅ Database connection test successful');
     connection.release();
   } catch (error) {
     console.error('❌ Database connection test failed:', error.message);
@@ -105,7 +105,7 @@ export async function closeDatabase() {
   if (pool) {
     await pool.end();
     pool = null;
-    console.log('✅ Database connection pool closed');
+    console.error('✅ Database connection pool closed');
   }
 }
 
