@@ -47,15 +47,12 @@ app.use(express.static(path.join(__dirname, 'storage')));
 import mcpRoutes from './routes/mcpRoutes.js';
 import { createMCPHttpApp } from './mcpServerHttp.js';
 
-// Mount MCP endpoints BEFORE catch-all route
+// MCP server without authentication
 const mcpApp = createMCPHttpApp();
 app.use('/mcp', mcpApp);
 
 // Mount REST API BEFORE catch-all route
 app.use('/api', mcpRoutes);
-
-
-
 
 // Catch-all route for SPA (must be AFTER API/MCP routes)
 app.get(/^\/(?!api|mcp).*/, function (req, res) {

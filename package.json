@@ -9,7 +9,8 @@
         "mcp": "node mcpServer.js",
         "mcp:http": "node mcpServerHttp.js",
         "dev": "node --watch server.js",
-        "test:mcp": "node test-mcp-connection.js"
+        "test:mcp": "node test-mcp-connection.js",
+        "setup-auth": "node setup-api-keys.js"
     },
     "repository": {
         "type": "git",
