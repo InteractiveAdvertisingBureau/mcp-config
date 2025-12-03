@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+README.md
+*.md
+.DS_Store
+*.log
+coverage
+.nyc_output
+test-mcp-client-http.js
+deploy.sh
+tl-openx-qa-service-account-key.json
