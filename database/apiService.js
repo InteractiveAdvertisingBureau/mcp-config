@@ -2,6 +2,34 @@
 import { query, queryOne } from './connection.js';
 
 /**
+ * Mask sensitive auth token in API object
+ * @param {Object} api - API object
+ * @param {Boolean} includeToken - Whether to include the actual token (for internal use)
+ * @returns {Object} API object with masked token
+ */
+function maskAuthToken(api, includeToken = false) {
+  if (!api) return api;
+
+  // If includeToken is true, return as-is (for internal API execution)
+  if (includeToken) return api;
+
+  // Mask the token for external responses
+  if (api.auth_token) {
+    api.auth_token = null; // Hide token completely
+  }
+
+  return api;
+}
+
+/**
+ * Mask auth tokens in array of APIs
+ */
+function maskAuthTokens(apis, includeToken = false) {
+  if (!Array.isArray(apis)) return apis;
+  return apis.map(api => maskAuthToken(api, includeToken));
+}
+
+/**
  * Register a new API
  */
 export async function registerAPI(apiData) {
@@ -32,8 +60,10 @@ export async function registerAPI(apiData) {
 
 /**
  * Get API by ID
+ * @param {Number} apiId - API ID
+ * @param {Boolean} includeToken - Whether to include auth token (default: false for security)
  */
-export async function getAPIById(apiId) {
+export async function getAPIById(apiId, includeToken = false) {
   const sql = `
     SELECT
       id,
@@ -63,13 +93,16 @@ export async function getAPIById(apiId) {
     }
   }
 
-  return api;
+  // Mask token unless explicitly requested for internal use
+  return maskAuthToken(api, includeToken);
 }
 
 /**
  * Get all registered APIs
+ * @param {Object} filters - Filter options
+ * @param {Boolean} includeToken - Whether to include auth tokens (default: false for security)
  */
-export async function getAllAPIs(filters = {}) {
+export async function getAllAPIs(filters = {}, includeToken = false) {
   let sql = `
     SELECT
       id,
@@ -111,12 +144,15 @@ export async function getAllAPIs(filters = {}) {
   const apis = await query(sql, params);
 
   // Parse JSON fields
-  return apis.map(api => ({
+  const parsedApis = apis.map(api => ({
     ...api,
     request_params: typeof api.request_params === 'string'
       ? JSON.parse(api.request_params)
       : api.request_params
   }));
+
+  // Mask tokens unless explicitly requested for internal use
+  return maskAuthTokens(parsedApis, includeToken);
 }
 
 /**

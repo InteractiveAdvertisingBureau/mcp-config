@@ -294,7 +294,8 @@ function createMCPServer() {
 
         case 'query-api-with-summary': {
           console.log(`🔍 [MCP] Querying API ${args.api_id} with summary`);
-          const api = await apiService.getAPIById(args.api_id);
+          // Fetch API with auth token for internal execution
+          const api = await apiService.getAPIById(args.api_id, true);
           if (!api) {
             return {
               content: [{
@@ -305,7 +306,7 @@ function createMCPServer() {
             };
           }
 
-          // Execute API call
+          // Execute API call (auth token will be auto-injected by apiTester)
           const testResult = await apiTester.executeAPICall(api, {
             params: args.params || api.request_params || {},
             headers: args.headers || {}
@@ -355,7 +356,8 @@ Provide:
 
         case 'validate-and-execute-api': {
           console.log(`✅ [MCP] Validating and executing API ${args.api_id}`);
-          const api = await apiService.getAPIById(args.api_id);
+          // Fetch API with auth token for internal execution
+          const api = await apiService.getAPIById(args.api_id, true);
           if (!api) {
             return {
               content: [{

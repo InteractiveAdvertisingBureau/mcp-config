@@ -472,7 +472,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'query-api-with-summary': {
         console.error(`🔍 [MCP] Querying API ${args.api_id} with summary`);
-        const api = await apiService.getAPIById(args.api_id);
+        // Fetch API with auth token for internal execution
+        const api = await apiService.getAPIById(args.api_id, true);
         if (!api) {
           return {
             content: [{
@@ -483,7 +484,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        // Execute API call
+        // Execute API call (auth token will be auto-injected by apiTester)
         const testResult = await apiTester.executeAPICall(api, {
           params: args.params || api.request_params || {},
           headers: args.headers || {}
@@ -533,7 +534,8 @@ Provide:
 
       case 'validate-and-execute-api': {
         console.error(`✅ [MCP] Validating and executing API ${args.api_id}`);
-        const api = await apiService.getAPIById(args.api_id);
+        // Fetch API with auth token for internal execution
+        const api = await apiService.getAPIById(args.api_id, true);
         if (!api) {
           return {
             content: [{

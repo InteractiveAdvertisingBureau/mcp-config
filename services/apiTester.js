@@ -10,8 +10,8 @@ export async function testAPIWithScenarios(apiId, scenarios = []) {
   try {
     console.error(`🧪 Testing API ID: ${apiId} with ${scenarios.length} scenarios`);
 
-    // Get API details from database
-    const api = await apiService.getAPIById(apiId);
+    // Get API details from database with auth token for execution
+    const api = await apiService.getAPIById(apiId, true);
     if (!api) {
       throw new Error(`API not found: ${apiId}`);
     }
@@ -96,6 +96,17 @@ async function runTestScenario(api, scenario) {
       timeout: 30000, // 30 second timeout
       validateStatus: () => true // Don't throw on any status code
     };
+
+    // Auto-inject authentication token if API requires auth
+    if (api.auth_required && api.auth_token) {
+      if (api.auth_type === 'Bearer Token' || api.auth_type === 'Bearer') {
+        config.headers['Authorization'] = `Bearer ${api.auth_token}`;
+        console.error(`🔐 Auto-injected Bearer token for authenticated request`);
+      } else if (api.auth_type === 'API Key') {
+        config.headers['X-API-Key'] = api.auth_token;
+        console.error(`🔐 Auto-injected API Key for authenticated request`);
+      }
+    }
 
     // Add request body/params based on method
     if (['post', 'put', 'patch'].includes(config.method)) {
