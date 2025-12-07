@@ -85,10 +85,23 @@ async function runTestScenario(api, scenario) {
   };
 
   try {
+    // Build final URL by replacing path parameters
+    let finalUrl = api.endpoint;
+    const pathParams = (scenario.params?.path || api.request_params?.path || {});
+
+    // Replace {param} placeholders in URL with actual values
+    for (const [key, value] of Object.entries(pathParams)) {
+      const placeholder = `{${key}}`;
+      if (finalUrl.includes(placeholder)) {
+        finalUrl = finalUrl.replace(new RegExp(`\\{${key}\\}`, 'g'), encodeURIComponent(value));
+        console.error(`🔀 Replaced path parameter: {${key}} → ${value}`);
+      }
+    }
+
     // Prepare request config
     const config = {
       method: api.method.toLowerCase(),
-      url: api.endpoint,
+      url: finalUrl,
       headers: {
         'Content-Type': api.request_type,
         ...(scenario.headers || {})
@@ -108,11 +121,17 @@ async function runTestScenario(api, scenario) {
       }
     }
 
-    // Add request body/params based on method
+    // Add query params and body (excluding path params)
+    const queryParams = scenario.params?.query || api.request_params?.query || {};
+    const bodyParams = scenario.params?.body || api.request_params?.body || {};
+
     if (['post', 'put', 'patch'].includes(config.method)) {
-      config.data = scenario.params || api.request_params;
+      config.data = bodyParams;
+      if (Object.keys(queryParams).length > 0) {
+        config.params = queryParams;
+      }
     } else if (['get', 'delete'].includes(config.method)) {
-      config.params = scenario.params || api.request_params;
+      config.params = queryParams;
     }
 
     console.error(`🔍 Testing ${api.method} ${api.endpoint} (${scenario.name})`);

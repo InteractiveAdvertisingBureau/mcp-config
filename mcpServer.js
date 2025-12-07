@@ -11,6 +11,7 @@ import {
 import { initializeDatabase } from './database/connection.js';
 import * as apiService from './database/apiService.js';
 import * as apiTester from './services/apiTester.js';
+import { multiModelService } from './services/multiModelService.js';
 
 // Initialize database
 initializeDatabase();
@@ -228,7 +229,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'query-api-with-summary',
-      description: 'Execute an API call and return response with AI-generated summary and analysis',
+      description: 'Execute an API call and return response with AI-generated summary and analysis. First call get-api to see required parameters, then call this with appropriate params structure: {path: {...}, query: {...}, body: {...}}',
       inputSchema: {
         type: 'object',
         properties: {
@@ -238,7 +239,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           params: {
             type: 'object',
-            description: 'Request parameters for the API call'
+            description: 'Request parameters structured as: {path: {key: value}, query: {key: value}, body: {key: value}}. Path params replace {placeholders} in URL',
+            properties: {
+              path: {
+                type: 'object',
+                description: 'Path parameters to replace {placeholders} in the endpoint URL'
+              },
+              query: {
+                type: 'object',
+                description: 'Query string parameters (appended as ?key=value)'
+              },
+              body: {
+                type: 'object',
+                description: 'Request body for POST/PUT/PATCH requests'
+              }
+            }
           },
           headers: {
             type: 'object',
@@ -357,6 +372,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             isError: true
           };
         }
+
+        // Add parameter guidance for Claude Desktop
+        if (api) {
+          const parameterGuide = {
+            endpoint: api.endpoint,
+            method: api.method,
+            parameters: api.request_params || {},
+            example_usage: `To call this API, use query-api-with-summary with:\n` +
+              `{\n  "api_id": ${api.id},\n  "params": ${JSON.stringify(api.request_params || {}, null, 2)}\n}`
+          };
+          api.parameter_guide = parameterGuide;
+        }
+
         return {
           content: [{
             type: 'text',
@@ -490,8 +518,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           headers: args.headers || {}
         });
 
-        // Generate AI summary
-        const summaryPrompt = `Analyze this API response and provide a concise summary:
+        // If API call itself failed, return error immediately
+        if (testResult.error) {
+          console.error(`❌ API call failed: ${testResult.error}`);
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                api_id: args.api_id,
+                api_name: api.name,
+                endpoint: api.endpoint,
+                method: api.method,
+                error: testResult.error,
+                response_time: testResult.response_time
+              }, null, 2)
+            }],
+            isError: true
+          };
+        }
+
+        // Generate AI summary with fallback
+        let aiSummary = 'AI summary not available';
+        let modelUsed = 'none';
+
+        try {
+          const summaryPrompt = `Analyze this API response and provide a concise summary:
 
 API: ${api.name} (${api.method} ${api.endpoint})
 Status: ${testResult.status}
@@ -506,10 +558,18 @@ Provide:
 3. Any notable patterns or insights
 4. Potential issues or recommendations`;
 
-        const aiResponse = await multiModelService.generateCompletion('default', summaryPrompt, {
-          temperature: 0.3,
-          maxTokens: 500
-        });
+          const aiResponse = await multiModelService.generateCompletion('default', summaryPrompt, {
+            temperature: 0.3,
+            maxTokens: 500
+          });
+
+          aiSummary = aiResponse.content || aiResponse;
+          modelUsed = aiResponse.provider || 'default';
+          console.error(`✅ AI summary generated using ${modelUsed}`);
+        } catch (aiError) {
+          console.error(`⚠️  AI summary generation failed: ${aiError.message}`);
+          aiSummary = `AI summary generation failed: ${aiError.message}. API response returned successfully.`;
+        }
 
         return {
           content: [{
@@ -525,8 +585,8 @@ Provide:
                 response_time: testResult.response_time,
                 body: testResult.body
               },
-              ai_summary: aiResponse.content || aiResponse,
-              model_used: aiResponse.provider || 'default'
+              ai_summary: aiSummary,
+              model_used: modelUsed
             }, null, 2)
           }]
         };
