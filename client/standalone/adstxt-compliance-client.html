@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ads.txt & Compliance Query System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .query-section {
+            margin-bottom: 30px;
+        }
+
+        .query-section label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .query-input-wrapper {
+            display: flex;
+            gap: 12px;
+        }
+
+        .query-input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.2s;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+
+        .examples {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .examples h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .example-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .example-chip {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-chip:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .results-header h2 {
+            font-size: 18px;
+            color: #1f2937;
+        }
+
+        .clear-btn {
+            font-size: 13px;
+            padding: 8px 16px;
+            background: transparent;
+            color: #6b7280;
+            border: 1px solid #e5e7eb;
+        }
+
+        .clear-btn:hover {
+            background: #f3f4f6;
+        }
+
+        .results-container {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .result-query {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .result-content {
+            color: #374151;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .result-content pre {
+            background: #f3f4f6;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .result-time {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 8px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 40px;
+            color: #6b7280;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 14px;
+            border-left: 4px solid #ef4444;
+        }
+
+        .success-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #d1fae5;
+            color: #065f46;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .error-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .config-section {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .config-section label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #92400e;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .config-section input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #fcd34d;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .config-section small {
+            display: block;
+            margin-top: 6px;
+            color: #92400e;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Ads.txt & Compliance Query System</h1>
+            <p>Ask questions about ads.txt and compliance status using natural language</p>
+            <div class="connection-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- MCP Server Configuration -->
+            <div class="config-section">
+                <label for="mcpEndpoint">MCP Server Endpoint</label>
+                <input
+                    type="text"
+                    id="mcpEndpoint"
+                    placeholder="http://localhost:3000/mcp/sse"
+                    value="http://localhost:3000/mcp/sse"
+                >
+                <small>Change this if your MCP server is running on a different host/port</small>
+            </div>
+
+            <!-- Query Input -->
+            <div class="query-section">
+                <label for="queryInput">💬 Ask a Question</label>
+                <div class="query-input-wrapper">
+                    <textarea
+                        id="queryInput"
+                        class="query-input"
+                        placeholder="e.g., Which domains have both ads.txt and compliance?"
+                    ></textarea>
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="askBtn" onclick="sendQuery()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Ask
+                        </button>
+                        <button class="btn btn-secondary clear-btn" onclick="clearQuery()">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example Queries -->
+            <div class="examples">
+                <h3>📋 Example Queries</h3>
+                <div class="example-chips">
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">Show podcast compliance</span>
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">Get OMSDK compliance</span>
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">Show data transparency compliance</span>
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">Get MSPA signatory list</span>
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">Show compliance status for all domains</span>
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">Query API 19</span>
+                    <span class="example-chip" onclick="fillQuery(this.textContent)">List all APIs</span>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div class="results-section">
+                <div class="results-header">
+                    <h2>📊 Results</h2>
+                    <button class="btn clear-btn" onclick="clearResults()">Clear All</button>
+                </div>
+                <div class="results-container" id="resultsContainer">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <p>No queries yet. Ask a question to get started!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MCP Client Configuration
+        let mcpEndpoint = 'http://localhost:3000/mcp/sse';
+        let isConnected = false;
+        let results = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkConnection();
+            loadEndpointFromStorage();
+
+            // Save endpoint on change
+            document.getElementById('mcpEndpoint').addEventListener('change', (e) => {
+                mcpEndpoint = e.target.value;
+                localStorage.setItem('mcpEndpoint', mcpEndpoint);
+                checkConnection();
+            });
+
+            // Enter key to send
+            document.getElementById('queryInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    sendQuery();
+                }
+            });
+        });
+
+        function loadEndpointFromStorage() {
+            const saved = localStorage.getItem('mcpEndpoint');
+            if (saved) {
+                mcpEndpoint = saved;
+                document.getElementById('mcpEndpoint').value = saved;
+            }
+        }
+
+        async function checkConnection() {
+            try {
+                // Check main API health endpoint
+                const healthUrl = mcpEndpoint.replace('/mcp/sse', '/api/health');
+                const response = await fetch(healthUrl);
+                if (response.ok) {
+                    setConnectionStatus(true);
+                } else {
+                    setConnectionStatus(false);
+                }
+            } catch (error) {
+                console.error('Connection check failed:', error);
+                setConnectionStatus(false);
+            }
+        }
+
+        function setConnectionStatus(connected) {
+            isConnected = connected;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (connected) {
+                statusDot.classList.remove('disconnected');
+                statusText.textContent = 'Connected to MCP Server';
+            } else {
+                statusDot.classList.add('disconnected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function fillQuery(text) {
+            document.getElementById('queryInput').value = text;
+            document.getElementById('queryInput').focus();
+        }
+
+        function clearQuery() {
+            document.getElementById('queryInput').value = '';
+            document.getElementById('queryInput').focus();
+        }
+
+        function clearResults() {
+            results = [];
+            renderResults();
+        }
+
+        async function sendQuery() {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+
+            if (!query) {
+                alert('Please enter a question');
+                return;
+            }
+
+            if (!isConnected) {
+                alert('Not connected to MCP server. Check your endpoint configuration.');
+                return;
+            }
+
+            // Disable button
+            const askBtn = document.getElementById('askBtn');
+            askBtn.disabled = true;
+            askBtn.innerHTML = '<span class="spinner"></span> Processing...';
+
+            // Add loading state to results
+            addLoadingResult(query);
+
+            try {
+                // Call MCP server
+                const result = await callMCPServer(query);
+
+                // Add result
+                addResult(query, result, 'success');
+
+                // Clear input
+                queryInput.value = '';
+            } catch (error) {
+                addResult(query, `Error: ${error.message}`, 'error');
+            } finally {
+                // Re-enable button
+                askBtn.disabled = false;
+                askBtn.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    Ask
+                `;
+            }
+        }
+
+        async function callMCPServer(query) {
+            // Parse query to determine which MCP tool to call
+            const toolCall = parseQueryToToolCall(query);
+
+            // Make MCP request with proper headers for SSE transport
+            const response = await fetch(mcpEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/event-stream'
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: Date.now(),
+                    method: 'tools/call',
+                    params: {
+                        name: toolCall.tool,
+                        arguments: toolCall.arguments
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            // Get response as text first (may be SSE format)
+            const responseText = await response.text();
+
+            // Parse SSE format if present
+            let data;
+            if (responseText.startsWith('event:')) {
+                // SSE format: "event: message\ndata: {json}\n\n"
+                const lines = responseText.split('\n');
+                const dataLine = lines.find(line => line.startsWith('data: '));
+                if (dataLine) {
+                    const jsonStr = dataLine.substring(6); // Remove "data: " prefix
+                    data = JSON.parse(jsonStr);
+                } else {
+                    throw new Error('Invalid SSE format: no data line found');
+                }
+            } else {
+                // Regular JSON
+                data = JSON.parse(responseText);
+            }
+
+            if (data.error) {
+                throw new Error(data.error.message || 'MCP server error');
+            }
+
+            // Extract content from MCP response format
+            if (data.result && data.result.content && data.result.content[0]) {
+                const content = data.result.content[0].text;
+                try {
+                    return JSON.parse(content);
+                } catch (e) {
+                    return content;
+                }
+            }
+
+            return data.result;
+        }
+
+        function parseQueryToToolCall(query) {
+            const lowerQuery = query.toLowerCase();
+
+            // Extract API ID if mentioned
+            const apiIdMatch = lowerQuery.match(/api\s+(\d+)/);
+            const apiId = apiIdMatch ? parseInt(apiIdMatch[1]) : null;
+
+            // === COMPLIANCE-SPECIFIC QUERIES ===
+
+            // Compliance queries (API 16-20 are compliance APIs)
+            if (lowerQuery.includes('compliance')) {
+                if (lowerQuery.includes('podcast')) {
+                    return { tool: 'query-api-with-summary', arguments: { api_id: 16 } }; // Podcast Compliance
+                }
+                if (lowerQuery.includes('omsdk')) {
+                    return { tool: 'query-api-with-summary', arguments: { api_id: 18 } }; // OMSDK Compliance
+                }
+                if (lowerQuery.includes('data transparency') || lowerQuery.includes('datatransparency')) {
+                    return { tool: 'query-api-with-summary', arguments: { api_id: 19 } }; // Data Transparency
+                }
+                if (lowerQuery.includes('status') || lowerQuery.includes('all')) {
+                    // Return list-apis filtered by compliance
+                    return { tool: 'list-apis', arguments: {} };
+                }
+            }
+
+            // MSPA queries
+            if (lowerQuery.includes('mspa') || lowerQuery.includes('signatory')) {
+                return { tool: 'query-api-with-summary', arguments: { api_id: 20 } }; // MSPA Signatory List
+            }
+
+            // Ads.txt queries
+            if (lowerQuery.includes('ads') && lowerQuery.includes('txt')) {
+                // Currently no specific ads.txt API, list relevant ones
+                return { tool: 'list-apis', arguments: {} };
+            }
+
+            // Domain-related queries
+            if (lowerQuery.includes('domain') || lowerQuery.includes('domains')) {
+                if (lowerQuery.includes('both') || lowerQuery.includes('have ads.txt and compliance')) {
+                    // Complex query - list APIs and let user analyze
+                    return { tool: 'list-apis', arguments: {} };
+                }
+                if (lowerQuery.includes('missing')) {
+                    return { tool: 'list-apis', arguments: {} };
+                }
+            }
+
+            // === STANDARD MCP TOOL QUERIES ===
+
+            // Explicit list command
+            if (lowerQuery.match(/^list(\s+all)?(\s+apis?)?$/)) {
+                return { tool: 'list-apis', arguments: {} };
+            }
+
+            // Query with summary (explicit API ID)
+            if ((lowerQuery.includes('query') || lowerQuery.includes('call') || lowerQuery.includes('execute')) && apiId) {
+                return { tool: 'query-api-with-summary', arguments: { api_id: apiId } };
+            }
+
+            // Get API details
+            if ((lowerQuery.includes('get') || lowerQuery.includes('show') || lowerQuery.includes('details')) && apiId) {
+                return { tool: 'get-api', arguments: { api_id: apiId } };
+            }
+
+            // Validate and execute
+            if (lowerQuery.includes('validate') && apiId) {
+                return { tool: 'validate-and-execute-api', arguments: { api_id: apiId } };
+            }
+
+            // Get statistics
+            if ((lowerQuery.includes('statistics') || lowerQuery.includes('stats') || lowerQuery.includes('metrics')) && apiId) {
+                return { tool: 'get-api-statistics', arguments: { api_id: apiId } };
+            }
+
+            // Show/Get without API ID - provide a helpful message
+            if (lowerQuery.includes('show') || lowerQuery.includes('get') || lowerQuery.includes('list')) {
+                return { tool: 'list-apis', arguments: {} };
+            }
+
+            // If query mentions specific numbers, try to query that API
+            if (apiId) {
+                return { tool: 'query-api-with-summary', arguments: { api_id: apiId } };
+            }
+
+            // Default: Show error message
+            throw new Error('Could not understand query. Try: "List all APIs", "Query API 16", or "Show compliance status"');
+        }
+
+        function addLoadingResult(query) {
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Processing your query...</span>
+                </div>
+            `;
+        }
+
+        function addResult(query, result, type = 'success') {
+            results.unshift({
+                query,
+                result,
+                type,
+                timestamp: new Date().toLocaleString()
+            });
+
+            renderResults();
+        }
+
+        function renderResults() {
+            const container = document.getElementById('resultsContainer');
+
+            if (results.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <p>No queries yet. Ask a question to get started!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = results.map(r => {
+                const badge = r.type === 'success'
+                    ? '<span class="success-badge">✓ Success</span>'
+                    : '<span class="error-badge">✗ Error</span>';
+
+                let content = '';
+                if (typeof r.result === 'object') {
+                    content = `<pre>${JSON.stringify(r.result, null, 2)}</pre>`;
+                } else {
+                    content = r.result;
+                }
+
+                return `
+                    <div class="result-item">
+                        <div class="result-query">
+                            ${badge} ${r.query}
+                        </div>
+                        <div class="result-content">${content}</div>
+                        <div class="result-time">${r.timestamp}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Periodic connection check
+        setInterval(checkConnection, 10000);
+    </script>
+</body>
+</html>

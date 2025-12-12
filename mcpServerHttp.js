@@ -332,6 +332,9 @@ function createMCPServer() {
             };
           }
 
+          console.log(`🔐 [MCP] API ${api.id} auth config: auth_required=${api.auth_required}, auth_type=${api.auth_type}, has_token=${!!api.auth_token}`);
+          console.log(`📋 [MCP] API request_params:`, JSON.stringify(api.request_params, null, 2));
+
           // Execute API call (auth token will be auto-injected by apiTester)
           const testResult = await apiTester.executeAPICall(api, {
             params: args.params || api.request_params || {},
@@ -358,38 +361,28 @@ function createMCPServer() {
             };
           }
 
-          // Generate AI summary with fallback
-          let aiSummary = 'AI summary not available';
-          let modelUsed = 'none';
+          // Filter large responses to avoid context overflow
+          let responseBody = testResult.body;
+          let filtered = false;
 
-          try {
-            const summaryPrompt = `Analyze this API response and provide a concise summary:
-
-API: ${api.name} (${api.method} ${api.endpoint})
-Status: ${testResult.status}
-Response Time: ${testResult.response_time}ms
-
-Response Data:
-${JSON.stringify(testResult.body, null, 2)}
-
-Provide:
-1. Brief summary of what the API returned
-2. Key data points
-3. Any notable patterns or insights
-4. Potential issues or recommendations`;
-
-            const aiResponse = await multiModelService.generateCompletion('default', summaryPrompt, {
-              temperature: 0.3,
-              maxTokens: 500
-            });
-
-            aiSummary = aiResponse.content || aiResponse;
-            modelUsed = aiResponse.provider || 'default';
-            console.log(`✅ AI summary generated using ${modelUsed}`);
-          } catch (aiError) {
-            console.log(`⚠️  AI summary generation failed: ${aiError.message}`);
-            aiSummary = `AI summary generation failed: ${aiError.message}. API response returned successfully.`;
+          // If response is an array and query params contain domain/company, filter
+          if (Array.isArray(responseBody) && responseBody.length > 50) {
+            const searchTerm = args.params?.query?.domain || args.params?.query?.company || args.params?.query?.name;
+            if (searchTerm) {
+              const originalLength = responseBody.length;
+              // Filter array to only matching records (case-insensitive search in all string fields)
+              responseBody = responseBody.filter(item => {
+                const itemStr = JSON.stringify(item).toLowerCase();
+                return itemStr.includes(searchTerm.toLowerCase().replace('.com', ''));
+              });
+              filtered = true;
+              console.log(`🔍 Filtered response: ${originalLength} → ${responseBody.length} records matching "${searchTerm}"`);
+            }
           }
+
+          // DISABLED: AI summary generation to reduce token usage and let Claude handle analysis
+          let aiSummary = filtered ? `Filtered to ${responseBody.length} relevant records` : 'Raw data returned';
+          let modelUsed = 'none';
 
           return {
             content: [{
@@ -400,10 +393,11 @@ Provide:
                 api_name: api.name,
                 endpoint: api.endpoint,
                 method: api.method,
+                filtered: filtered,
                 response: {
                   status: testResult.status,
                   response_time: testResult.response_time,
-                  body: testResult.body
+                  body: responseBody  // Use filtered body
                 },
                 ai_summary: aiSummary,
                 model_used: modelUsed

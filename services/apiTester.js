@@ -114,16 +114,38 @@ async function runTestScenario(api, scenario) {
     if (api.auth_required && api.auth_token) {
       if (api.auth_type === 'Bearer Token' || api.auth_type === 'Bearer') {
         config.headers['Authorization'] = `Bearer ${api.auth_token}`;
-        console.error(`🔐 Auto-injected Bearer token for authenticated request`);
+        const tokenPreview = api.auth_token.substring(0, 20) + '...';
+        console.error(`🔐 Auto-injected Bearer token for authenticated request: ${tokenPreview}`);
       } else if (api.auth_type === 'API Key') {
         config.headers['X-API-Key'] = api.auth_token;
         console.error(`🔐 Auto-injected API Key for authenticated request`);
       }
+    } else if (api.auth_required && !api.auth_token) {
+      console.error(`⚠️  WARNING: API requires auth but no token is stored!`);
     }
 
     // Add query params and body (excluding path params)
-    const queryParams = scenario.params?.query || api.request_params?.query || {};
-    const bodyParams = scenario.params?.body || api.request_params?.body || {};
+    console.error(`🔍 [DEBUG] scenario.params:`, JSON.stringify(scenario.params, null, 2));
+    console.error(`🔍 [DEBUG] api.request_params:`, JSON.stringify(api.request_params, null, 2));
+
+    // MERGE params: DB params as defaults, scenario params override/add to them
+    let queryParams = {
+      ...(api.request_params?.query || {}),  // DB defaults (e.g., display: true)
+      ...(scenario.params?.query || {})       // User-provided params (e.g., domain: 'gameloft.com')
+    };
+    const bodyParams = {
+      ...(api.request_params?.body || {}),
+      ...(scenario.params?.body || {})
+    };
+
+    // TEMPORARY FIX: Hardcode display=true for ads.txt API (ID 24) until DB is updated
+    if (api.id === 24 && !queryParams.display) {
+      queryParams.display = "true";
+      console.error(`🔧 [TEMP FIX] Auto-added display=true for ads.txt API`);
+    }
+
+    console.error(`🔍 [DEBUG] Merged queryParams:`, JSON.stringify(queryParams, null, 2));
+    console.error(`🔍 [DEBUG] Merged bodyParams:`, JSON.stringify(bodyParams, null, 2));
 
     if (['post', 'put', 'patch'].includes(config.method)) {
       config.data = bodyParams;
@@ -135,6 +157,10 @@ async function runTestScenario(api, scenario) {
     }
 
     console.error(`🔍 Testing ${api.method} ${api.endpoint} (${scenario.name})`);
+    console.error(`📋 Request Headers:`, JSON.stringify(config.headers, null, 2));
+    console.error(`📋 Query Params (config.params):`, JSON.stringify(config.params || {}, null, 2));
+    console.error(`📋 Base URL:`, finalUrl);
+    console.error(`📋 Full Axios Config:`, JSON.stringify({ method: config.method, url: config.url, params: config.params }, null, 2));
 
     // Execute request
     const response = await axios(config);
@@ -145,6 +171,10 @@ async function runTestScenario(api, scenario) {
     result.body = response.data;
     result.success = response.status >= 200 && response.status < 400;
 
+    // Log the actual URL that was called (axios adds query params to this)
+    console.error(`📋 Actual Request URL:`, response.request?.path || response.config?.url);
+    console.error(`📋 Response Body Length:`, typeof response.data === 'string' ? response.data.length : JSON.stringify(response.data).length);
+    console.error(`📋 Response Body Preview:`, typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200));
     console.error(`${result.success ? '✅' : '❌'} Test completed: ${response.status} (${result.response_time}ms)`);
 
   } catch (error) {
