@@ -257,7 +257,8 @@
 
         .message-content h1,
         .message-content h2,
-        .message-content h3 {
+        .message-content h3,
+        .message-content h4 {
             margin: 16px 0 8px 0;
             color: #000000;
             font-weight: 600;
@@ -273,6 +274,10 @@
 
         .message-content h3 {
             font-size: 18px;
+        }
+
+        .message-content h4 {
+            font-size: 16px;
         }
 
         .message-content strong {
@@ -576,14 +581,14 @@
         <div class="main-chat">
             <div class="chat-header">
                 <h1>
-                    <div class="logo">AI</div>
+                    <div class="logo">TL</div>
                     Tech Lab Chat Assistant
                 </h1>
             </div>
 
             <div class="chat-messages" id="chatMessages">
                 <div class="empty-state">
-                    <div class="logo-large">AI</div>
+                    <div class="logo-large">TL</div>
                     <h3>How can I help you today?</h3>
                     <p>Ask me questions about compliance APIs, ads.txt, or anything else!</p>
                 </div>
@@ -591,8 +596,8 @@
 
             <div class="chat-input-area">
                 <div class="suggestions" id="suggestions">
-                    <span class="suggestion-chip" onclick="sendSuggestion(this.textContent)">Which domains have
-                        ads.txt?</span>
+                    <span class="suggestion-chip" onclick="sendSuggestion(this.textContent)"> get
+                        ads.txt data for cbs.com</span>
                     <span class="suggestion-chip" onclick="sendSuggestion(this.textContent)">Show me podcast compliance
                         data</span>
                     <span class="suggestion-chip" onclick="sendSuggestion(this.textContent)">What is OMSDK
@@ -602,7 +607,7 @@
                 </div>
 
                 <div class="input-wrapper">
-                    <textarea id="chatInput" class="chat-input" placeholder="Message AI Chat..." rows="1"></textarea>
+                    <textarea id="chatInput" class="chat-input" placeholder="Message Tech Lab..." rows="1"></textarea>
                     <button class="send-btn" id="sendBtn" onclick="sendMessage()">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                             <path
@@ -678,7 +683,7 @@
             const messagesContainer = document.getElementById('chatMessages');
             messagesContainer.innerHTML = `
                 <div class="empty-state">
-                    <div class="logo-large">AI</div>
+                    <div class="logo-large">TL</div>
                     <h3>How can I help you today?</h3>
                     <p>Ask me questions about compliance APIs, ads.txt, or anything else!</p>
                 </div>
@@ -855,7 +860,8 @@
             // Inline code
             html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
-            // Headers (### h3, ## h2, # h1)
+            // Headers (#### h4, ### h3, ## h2, # h1) - Process from most specific to least
+            html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
             html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
             html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
             html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
@@ -898,7 +904,7 @@
             if (role === 'user') {
                 avatar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
             } else if (role === 'assistant') {
-                avatar.textContent = 'AI';
+                avatar.textContent = 'TL';
             } else {
                 avatar.textContent = '⚠️';
             }
@@ -955,7 +961,7 @@
 
             const avatar = document.createElement('div');
             avatar.className = 'avatar ai-avatar';
-            avatar.textContent = 'AI';
+            avatar.textContent = 'TL';
 
             const typingDiv = document.createElement('div');
             typingDiv.className = 'typing-indicator show';

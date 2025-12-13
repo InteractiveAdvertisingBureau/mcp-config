@@ -133,9 +133,12 @@ async function fetchMCPTools() {
         const response = await mcpClient.listTools();
 
         if (response && response.tools) {
-            MCP_TOOLS = response.tools;
+            // Filter out admin-only tools that shouldn't be exposed to chat users
+            const ADMIN_TOOLS = ['register-api', 'update-api', 'delete-api'];
+            MCP_TOOLS = response.tools.filter(tool => !ADMIN_TOOLS.includes(tool.name));
+
             mcpServerConnected = true;
-            console.log(`✅ Loaded ${MCP_TOOLS.length} tools from MCP server`);
+            console.log(`✅ Loaded ${MCP_TOOLS.length} tools from MCP server (${response.tools.length - MCP_TOOLS.length} admin tools filtered)`);
             MCP_TOOLS.forEach(tool => {
                 console.log(`   - ${tool.name}: ${tool.description}`);
             });
@@ -203,7 +206,7 @@ async function executeMCPTool(toolName, toolInput) {
 // System prompt for all providers
 const SYSTEM_PROMPT = `AI assistant for Ads.txt & Compliance APIs.
 
-API IDs: Podcast=16, OMSDK=18, DataTransparency=19, MSPA=20, AdsTxt=24
+To find available APIs, call the list-apis tool first. Filter the list to find the relevant API ID for the user's query.
 
 CRITICAL: When calling query-api-with-summary tool, use EXACT format:
 {

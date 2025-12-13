@@ -32,8 +32,11 @@ function createMCPServer() {
   );
 
   // Register all tools (same as stdio version)
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
+  // Environment variable to control admin tool exposure (default: true for backward compatibility)
+  const ENABLE_ADMIN_TOOLS = process.env.MCP_ENABLE_ADMIN_TOOLS !== 'false';
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const allTools = [
       {
         name: 'register-api',
         description: 'Register a new API endpoint for testing',
@@ -211,8 +214,20 @@ function createMCPServer() {
           required: ['api_id']
         }
       }
-    ]
-  }));
+    ];
+
+    // Filter admin tools based on environment variable
+    const ADMIN_TOOLS = ['register-api', 'update-api', 'delete-api'];
+    const exposedTools = ENABLE_ADMIN_TOOLS
+      ? allTools
+      : allTools.filter(tool => !ADMIN_TOOLS.includes(tool.name));
+
+    if (!ENABLE_ADMIN_TOOLS) {
+      console.log(`🔒 Admin tools disabled (filtered: ${ADMIN_TOOLS.join(', ')})`);
+    }
+
+    return { tools: exposedTools };
+  });
 
   // Tool handlers
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
