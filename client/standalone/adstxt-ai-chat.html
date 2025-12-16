@@ -620,7 +620,19 @@
     </div>
 
     <script>
-        let aiEndpoint = 'http://localhost:4000/api/ai-chat';
+        // Auto-detect AI endpoint based on current host
+        // Works for both local (http://localhost:3000) and Cloud Run (https://xxx.run.app)
+        const currentProtocol = window.location.protocol; // http: or https:
+        const currentHost = window.location.hostname;
+        const currentPort = window.location.port;
+
+        // Build base URL: only include port for local development
+        const baseUrl = currentPort
+            ? `${currentProtocol}//${currentHost}:${currentPort}`
+            : `${currentProtocol}//${currentHost}`;
+
+        let aiEndpoint = `${baseUrl}/api/ai-chat`;
+
         let isConnected = false;
         let conversationHistory = [];
         let conversations = []; // Store all conversations
@@ -741,7 +753,12 @@
 
         async function checkConnection() {
             try {
-                const healthUrl = aiEndpoint.replace('/ai-chat', '/health');
+                // Cloud Run or port 3000 uses /api/ai-health
+                // Standalone port 4000 uses /api/health
+                const isStandalone = currentPort === '4000';
+                const healthUrl = isStandalone
+                    ? aiEndpoint.replace('/ai-chat', '/health')
+                    : aiEndpoint.replace('/ai-chat', '/ai-health');
                 const response = await fetch(healthUrl);
                 setConnectionStatus(response.ok);
             } catch (error) {
@@ -986,8 +1003,8 @@
             }
         }
 
-        // Periodic connection check
-        setInterval(checkConnection, 15000);
+        // Check connection only once on load (disabled periodic check to reduce server load)
+        // setInterval(checkConnection, 15000);
     </script>
 </body>
 

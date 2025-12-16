@@ -106,7 +106,7 @@ async function runTestScenario(api, scenario) {
         'Content-Type': api.request_type,
         ...(scenario.headers || {})
       },
-      timeout: 30000, // 30 second timeout
+      timeout: 45000, // 45 second timeout (balance between patience and MCP timeout)
       validateStatus: () => true // Don't throw on any status code
     };
 
@@ -179,7 +179,12 @@ async function runTestScenario(api, scenario) {
 
   } catch (error) {
     result.response_time = Date.now() - startTime;
-    result.error = error.message;
+    // Provide more helpful error messages
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      result.error = `Request timeout after ${result.response_time}ms - API did not respond in time. The API may be slow or unavailable.`;
+    } else {
+      result.error = error.message;
+    }
     result.success = false;
 
     if (error.response) {
