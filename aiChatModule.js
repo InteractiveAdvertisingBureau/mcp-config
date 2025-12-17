@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -419,6 +420,9 @@ export async function setupAIChat(app, options = {}) {
         }
     }
 
+    // Serve static files (images, CSS, JS) from standalone directory
+    app.use(`${basePath}/chat`, express.static(staticPath));
+
     // Serve AI chat UI
     app.get(`${basePath}/chat`, (req, res) => {
         res.sendFile(path.join(staticPath, 'adstxt-ai-chat.html'));
@@ -454,9 +458,59 @@ export async function setupAIChat(app, options = {}) {
 
             console.log(`\n💬 User message: ${message} (using ${AI_PROVIDER})`);
 
-            // Build conversation history (limit to save tokens)
+            // Build conversation history with intelligent token-aware pruning
+            // Keep recent messages but strip large tool results from older messages
+            let recentMessages = conversation.slice(-4); // Last 4 messages
+
+            // Prune old tool results to prevent context overflow
+            recentMessages = recentMessages.map((msg, index) => {
+                // Keep the most recent message fully intact
+                if (index === recentMessages.length - 1) {
+                    return msg;
+                }
+
+                // For older messages with tool_calls, keep only a summary
+                if (msg.role === 'assistant' && msg.tool_calls) {
+                    return {
+                        ...msg,
+                        tool_calls: msg.tool_calls.map(tc => ({
+                            ...tc,
+                            // Truncate function arguments/results to prevent token overflow
+                            function: {
+                                ...tc.function,
+                                arguments: '{}' // Remove large query params from history
+                            }
+                        }))
+                    };
+                }
+
+                // For tool result messages, keep only the summary
+                if (msg.role === 'tool') {
+                    try {
+                        const content = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                        // If response has many records, just keep a summary
+                        if (content.response && content.response.body && Array.isArray(content.response.body)) {
+                            return {
+                                ...msg,
+                                content: JSON.stringify({
+                                    ...content,
+                                    response: {
+                                        ...content.response,
+                                        body: `[${content.response.body.length} records - pruned from history to save tokens]`
+                                    }
+                                })
+                            };
+                        }
+                    } catch (e) {
+                        // If parsing fails, keep message as-is
+                    }
+                }
+
+                return msg;
+            });
+
             const messages = [
-                ...conversation.slice(-4), // Keep last 4 messages for context (2 exchanges)
+                ...recentMessages,
                 { role: 'user', content: message }
             ];
 

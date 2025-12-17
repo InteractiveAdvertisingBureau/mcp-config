@@ -126,16 +126,17 @@
         }
 
         .chat-header .logo {
-            width: 32px;
+            width: auto;
             height: 32px;
-            background: #dc3545;
-            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 18px;
+        }
+
+        .chat-header .logo img {
+            height: 100%;
+            width: auto;
+            object-fit: contain;
         }
 
         .connection-status {
@@ -227,9 +228,22 @@
             color: white;
         }
 
-        .avatar.ai-avatar {
-            background: #10a37f;
-            color: white;
+        .avatar.ai-avatar,
+        .avatar.assistant-avatar {
+            background: #ffffff;
+            padding: 4px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+
+        .avatar.ai-avatar img,
+        .avatar.assistant-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            max-width: 24px;
+            max-height: 24px;
         }
 
         .message-content {
@@ -501,17 +515,18 @@
         }
 
         .empty-state .logo-large {
-            width: 64px;
-            height: 64px;
-            background: #dc3545;
-            border-radius: 12px;
+            width: auto;
+            height: 80px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 32px;
             margin-bottom: 24px;
+        }
+
+        .empty-state .logo-large img {
+            height: 100%;
+            width: auto;
+            object-fit: contain;
         }
 
         .empty-state h3 {
@@ -581,14 +596,14 @@
         <div class="main-chat">
             <div class="chat-header">
                 <h1>
-                    <div class="logo">TL</div>
-                    Tech Lab Chat Assistant
+                    <div class="logo"><img src="iab-logo.png" alt="IAB Tech Lab"></div>
+                    Chat Assistant
                 </h1>
             </div>
 
             <div class="chat-messages" id="chatMessages">
                 <div class="empty-state">
-                    <div class="logo-large">TL</div>
+                    <div class="logo-large"><img src="iab-logo.png" alt="IAB Tech Lab"></div>
                     <h3>How can I help you today?</h3>
                     <p>Ask me questions about compliance APIs, ads.txt, or anything else!</p>
                 </div>
@@ -695,7 +710,7 @@
             const messagesContainer = document.getElementById('chatMessages');
             messagesContainer.innerHTML = `
                 <div class="empty-state">
-                    <div class="logo-large">TL</div>
+                    <div class="logo-large"><img src="iab-logo.png" alt="IAB Tech Lab"></div>
                     <h3>How can I help you today?</h3>
                     <p>Ask me questions about compliance APIs, ads.txt, or anything else!</p>
                 </div>
@@ -921,7 +936,7 @@
             if (role === 'user') {
                 avatar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
             } else if (role === 'assistant') {
-                avatar.textContent = 'TL';
+                avatar.innerHTML = '<img src="iab-logo.png" alt="IAB Tech Lab">';
             } else {
                 avatar.textContent = '⚠️';
             }
@@ -978,7 +993,7 @@
 
             const avatar = document.createElement('div');
             avatar.className = 'avatar ai-avatar';
-            avatar.textContent = 'TL';
+            avatar.innerHTML = '<img src="iab-logo.png" alt="IAB Tech Lab">';
 
             const typingDiv = document.createElement('div');
             typingDiv.className = 'typing-indicator show';

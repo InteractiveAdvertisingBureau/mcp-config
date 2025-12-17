@@ -379,19 +379,103 @@ function createMCPServer() {
           // Filter large responses to avoid context overflow
           let responseBody = testResult.body;
           let filtered = false;
+          let filterMessage = '';
 
-          // If response is an array and query params contain domain/company, filter
-          if (Array.isArray(responseBody) && responseBody.length > 50) {
-            const searchTerm = args.params?.query?.domain || args.params?.query?.company || args.params?.query?.name;
+          // AGGRESSIVE FILTERING: Always limit large arrays to prevent context overflow
+          if (Array.isArray(responseBody) && responseBody.length > 100) {
+            // Extract search term from various possible parameter structures
+            let searchTerm = null;
+
+            // Try nested query object first
+            if (args.params?.query) {
+              searchTerm = args.params.query.domain || args.params.query.company || args.params.query.name || args.params.query.seller;
+            }
+
+            // Try direct params
+            if (!searchTerm && args.params) {
+              searchTerm = args.params.domain || args.params.company || args.params.name || args.params.seller;
+            }
+
+            // Try to extract from any string value in params (catch "yahoo", "google", etc.)
+            if (!searchTerm && args.params) {
+              const allValues = Object.values(args.params).filter(v => typeof v === 'string' && v.length > 2);
+              if (allValues.length > 0) {
+                searchTerm = allValues[0]; // Use first meaningful string
+              }
+            }
+
+            const originalLength = responseBody.length;
+
             if (searchTerm) {
-              const originalLength = responseBody.length;
-              // Filter array to only matching records (case-insensitive search in all string fields)
+              // SQL LIKE-style filtering with intelligent pattern matching
+              // Clean the search term: remove special chars, TLDs, and extra whitespace
+              const cleanTerm = searchTerm
+                .toLowerCase()
+                .replace(/\.(com|net|org|io|inc|corp|llc|ltd)$/i, '') // Remove common suffixes
+                .replace(/[^\w\s]/g, '') // Remove special characters
+                .trim();
+
+              // Extract core term (first 4+ meaningful characters for fuzzy matching)
+              // e.g., "Yahoo" -> "yaho", "Google" -> "goog", "Xiaomi" -> "xiao"
+              const corePattern = cleanTerm.substring(0, Math.max(4, cleanTerm.length));
+
+              console.log(`🔍 Filtering with pattern: "${corePattern}" (from "${searchTerm}")`);
+
               responseBody = responseBody.filter(item => {
                 const itemStr = JSON.stringify(item).toLowerCase();
-                return itemStr.includes(searchTerm.toLowerCase().replace('.com', ''));
+
+                // SQL LIKE '%pattern%' - check if core pattern exists anywhere
+                if (itemStr.includes(corePattern)) {
+                  return true;
+                }
+
+                // Also try the full cleaned term for exact matches
+                if (cleanTerm.length > 4 && itemStr.includes(cleanTerm)) {
+                  return true;
+                }
+
+                return false;
               });
+
               filtered = true;
-              console.log(`🔍 Filtered response: ${originalLength} → ${responseBody.length} records matching "${searchTerm}"`);
+              filterMessage = `Filtered to ${responseBody.length} records matching "${searchTerm}" (pattern: "${corePattern}")`;
+              console.log(`🔍 Filtered response: ${originalLength} → ${responseBody.length} records matching pattern "${corePattern}"`);
+            } else {
+              // No search term - return intelligent sampling across alphabetical range
+              // This ensures we get a representative sample (A-Z) instead of just first 100
+              // Sort by companyName if available to get better distribution
+              try {
+                const hasCompanyName = responseBody[0] && ('companyName' in responseBody[0] || 'company_name' in responseBody[0] || 'name' in responseBody[0]);
+
+                if (hasCompanyName) {
+                  // Sort alphabetically
+                  responseBody.sort((a, b) => {
+                    const nameA = (a.companyName || a.company_name || a.name || '').toLowerCase();
+                    const nameB = (b.companyName || b.company_name || b.name || '').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                  });
+
+                  // Take samples across the alphabetical range (every Nth record)
+                  const step = Math.ceil(originalLength / 100);
+                  responseBody = responseBody.filter((_, index) => index % step === 0).slice(0, 100);
+
+                  filtered = true;
+                  filterMessage = `Sampled 100 records across alphabetical range (A-Z) from ${originalLength} total. For specific results, provide company name.`;
+                  console.log(`⚠️  Large response sampled: ${originalLength} → 100 records (distributed A-Z)`);
+                } else {
+                  // Fallback: just take first 100
+                  responseBody = responseBody.slice(0, 100);
+                  filtered = true;
+                  filterMessage = `Limited to first 100 records out of ${originalLength} total. Please provide specific search terms for better results.`;
+                  console.log(`⚠️  Large response truncated: ${originalLength} → 100 records (no search term provided)`);
+                }
+              } catch (sortError) {
+                // If sorting fails, just take first 100
+                responseBody = responseBody.slice(0, 100);
+                filtered = true;
+                filterMessage = `Limited to first 100 records out of ${originalLength} total. Please provide specific search terms for better results.`;
+                console.log(`⚠️  Large response truncated: ${originalLength} → 100 records (sorting failed)`);
+              }
             }
           }
 
