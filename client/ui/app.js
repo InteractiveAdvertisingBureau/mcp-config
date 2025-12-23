@@ -2,6 +2,7 @@
 const API_BASE = '/api';
 let currentAPIs = [];
 let currentScenarios = [];
+let editingApiId = null; // Track if we're editing an API
 
 // ============================================
 // Initialization
@@ -93,6 +94,11 @@ function setupEventListeners() {
 // ============================================
 
 function switchTab(tabName) {
+    // If switching away from register tab and we're in edit mode, clear the form
+    if (editingApiId !== null && tabName !== 'register') {
+        clearRegistrationForm();
+    }
+
     // Update tab buttons
     document.querySelectorAll('.tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -116,6 +122,25 @@ function switchTab(tabName) {
     } else if (tabName === 'query') {
         renderChatMessages();
     }
+}
+
+// Clear registration form and reset edit mode
+function clearRegistrationForm() {
+    document.getElementById('registerForm').reset();
+    document.getElementById('parametersBuilder').innerHTML = '';
+    parameterCounter = 0;
+    editingApiId = null;
+
+    // Clear auth field placeholders
+    document.getElementById('apiAuthToken').placeholder = 'Enter your API key or token';
+    document.getElementById('apiAuthUsername').placeholder = 'Enter username';
+    document.getElementById('apiAuthPassword').placeholder = 'Enter password';
+
+    // Reset submit button text
+    document.querySelector('#registerForm button[type="submit"]').textContent = 'Register API';
+
+    // Hide auth fields
+    toggleAuthFields();
 }
 
 // ============================================
@@ -252,9 +277,40 @@ function toggleAuthFields() {
     const requiresAuth = document.getElementById('apiRequiresAuth').value === 'true';
     const authTypeField = document.getElementById('apiAuthType');
     const authTokenGroup = document.getElementById('authTokenGroup');
+    const basicAuthGroup = document.getElementById('basicAuthGroup');
 
     authTypeField.disabled = !requiresAuth;
-    authTokenGroup.style.display = requiresAuth ? 'block' : 'none';
+
+    if (requiresAuth) {
+        // Show appropriate fields based on auth type
+        toggleAuthTypeFields();
+    } else {
+        // Hide all auth fields
+        authTokenGroup.style.display = 'none';
+        basicAuthGroup.style.display = 'none';
+    }
+}
+
+function toggleAuthTypeFields() {
+    const authType = document.getElementById('apiAuthType').value;
+    const authTokenGroup = document.getElementById('authTokenGroup');
+    const basicAuthGroup = document.getElementById('basicAuthGroup');
+
+    // Hide all first
+    authTokenGroup.style.display = 'none';
+    basicAuthGroup.style.display = 'none';
+
+    // Show appropriate fields based on auth type
+    if (authType === 'Basic Auth') {
+        basicAuthGroup.style.display = 'block';
+        // Clear token field when switching to Basic Auth
+        document.getElementById('apiAuthToken').value = '';
+    } else if (authType === 'Bearer Token' || authType === 'API Key') {
+        authTokenGroup.style.display = 'block';
+        // Clear Basic Auth fields when switching away
+        document.getElementById('apiAuthUsername').value = '';
+        document.getElementById('apiAuthPassword').value = '';
+    }
 }
 
 async function handleRegisterAPI(e) {
@@ -262,10 +318,29 @@ async function handleRegisterAPI(e) {
 
     const requiresAuth = document.getElementById('apiRequiresAuth').value === 'true';
     const authType = document.getElementById('apiAuthType').value;
-    const authToken = document.getElementById('apiAuthToken').value;
 
     // Collect parameters from builder
     const { parameters, metadata } = collectParameters();
+
+    let authToken = null;
+
+    // Handle authentication based on type
+    if (requiresAuth) {
+        if (authType === 'Basic Auth') {
+            // Get username and password for Basic Auth
+            const username = document.getElementById('apiAuthUsername').value;
+            const password = document.getElementById('apiAuthPassword').value;
+
+            if (username && password) {
+                // Encode as Base64: username:password
+                authToken = btoa(`${username}:${password}`);
+                console.log('🔐 Basic Auth credentials encoded');
+            }
+        } else {
+            // Bearer Token or API Key
+            authToken = document.getElementById('apiAuthToken').value || null;
+        }
+    }
 
     const formData = {
         name: document.getElementById('apiName').value,
@@ -275,7 +350,7 @@ async function handleRegisterAPI(e) {
         description: document.getElementById('apiDescription').value,
         auth_required: requiresAuth,
         auth_type: requiresAuth ? authType : null,
-        auth_token: requiresAuth && authToken ? authToken : null
+        auth_token: authToken
     };
 
     // Store all parameter locations (body, query, path, headers)
@@ -286,13 +361,17 @@ async function handleRegisterAPI(e) {
         headers: parameters.headers
     };
 
-    console.log('📋 Registering API with parameters:', formData.request_params);
+    console.log('📋 ' + (editingApiId ? 'Updating' : 'Registering') + ' API with parameters:', formData.request_params);
 
     showLoading(true);
 
     try {
-        const response = await fetch(`${API_BASE}/register`, {
-            method: 'POST',
+        // Determine if we're creating or updating
+        const url = editingApiId ? `${API_BASE}/apis/${editingApiId}` : `${API_BASE}/register`;
+        const method = editingApiId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
         });
@@ -300,18 +379,27 @@ async function handleRegisterAPI(e) {
         const result = await response.json();
 
         if (result.success) {
-            showToast('API registered successfully!', 'success');
+            showToast(editingApiId ? 'API updated successfully!' : 'API registered successfully!', 'success');
             document.getElementById('registerForm').reset();
             // Clear parameter builder
             document.getElementById('parametersBuilder').innerHTML = '';
             parameterCounter = 0;
+            editingApiId = null; // Reset edit mode
+
+            // Clear auth field placeholders
+            document.getElementById('apiAuthToken').placeholder = 'Enter your API key or token';
+            document.getElementById('apiAuthUsername').placeholder = 'Enter username';
+            document.getElementById('apiAuthPassword').placeholder = 'Enter password';
+
+            // Update submit button text
+            document.querySelector('#registerForm button[type="submit"]').textContent = 'Register API';
             loadAPIs();
             switchTab('apis');
         } else {
-            showToast(result.message || 'Registration failed', 'error');
+            showToast(result.message || (editingApiId ? 'Update failed' : 'Registration failed'), 'error');
         }
     } catch (error) {
-        showToast('Error registering API: ' + error.message, 'error');
+        showToast('Error ' + (editingApiId ? 'updating' : 'registering') + ' API: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
@@ -428,20 +516,116 @@ function testAPI(id) {
     handleTestAPISelect();
 }
 
-function editAPI(id) {
-    const api = currentAPIs.find(a => a.id === id);
-    if (!api) return;
+async function editAPI(id) {
+    showLoading(true);
 
-    // Switch to register tab and populate form
-    switchTab('register');
-    document.getElementById('apiName').value = api.name;
-    document.getElementById('apiEndpoint').value = api.endpoint;
-    document.getElementById('apiMethod').value = api.method;
-    document.getElementById('apiRequestType').value = api.request_type;
-    document.getElementById('apiParams').value = JSON.stringify(api.request_params, null, 2);
-    document.getElementById('apiDescription').value = api.description || '';
+    try {
+        // Fetch API with token indicator for edit
+        const response = await fetch(`${API_BASE}/apis/${id}?includeToken=true`);
+        const result = await response.json();
 
-    showToast('Edit mode - Update the form and register again', 'info');
+        if (!result.success) {
+            showToast('Failed to load API for editing', 'error');
+            return;
+        }
+
+        const api = result.api;
+
+        // Set editing mode
+        editingApiId = id;
+
+        // Switch to register tab and populate form
+        switchTab('register');
+
+        // Basic fields
+        document.getElementById('apiName').value = api.name;
+        document.getElementById('apiEndpoint').value = api.endpoint;
+        document.getElementById('apiMethod').value = api.method;
+        document.getElementById('apiRequestType').value = api.request_type;
+        document.getElementById('apiDescription').value = api.description || '';
+
+        // Auth fields
+        document.getElementById('apiRequiresAuth').value = api.auth_required ? 'true' : 'false';
+        toggleAuthFields(); // Enable/disable auth fields
+
+        if (api.auth_required) {
+            document.getElementById('apiAuthType').value = api.auth_type || 'Bearer Token';
+            toggleAuthTypeFields(); // Show appropriate auth fields based on type
+
+            // Handle different auth types
+            if (api.auth_type === 'Basic Auth') {
+                // For Basic Auth, we don't decode the token for security reasons
+                // Just show placeholders indicating credentials are set
+                if (api.auth_token_exists) {
+                    document.getElementById('apiAuthUsername').placeholder = '(Username already set - enter new to update)';
+                    document.getElementById('apiAuthPassword').placeholder = '(Password already set - enter new to update)';
+                }
+            } else {
+                // Bearer Token or API Key
+                // Show placeholder if token exists
+                if (api.auth_token_exists) {
+                    document.getElementById('apiAuthToken').placeholder = '(Token already set - leave empty to keep)';
+                }
+            }
+        }
+
+        // Populate parameter builder with api.request_params
+        document.getElementById('parametersBuilder').innerHTML = '';
+
+        if (api.request_params) {
+            // Iterate through all parameter locations (body, query, path, headers)
+            ['body', 'query', 'path', 'headers'].forEach(location => {
+                const params = api.request_params[location] || {};
+
+                Object.entries(params).forEach(([name, value]) => {
+                    // Add parameter field
+                    addParameterField();
+
+                    // Get the last added parameter row
+                    const container = document.getElementById('parametersBuilder');
+                    const lastRow = container.lastElementChild;
+
+                    if (lastRow) {
+                        // Populate the fields
+                        lastRow.querySelector('.param-name').value = name;
+                        lastRow.querySelector('.param-location').value = location === 'headers' ? 'header' : location;
+
+                        // Determine type from value
+                        let type = 'string';
+                        if (typeof value === 'number') {
+                            type = 'number';
+                        } else if (typeof value === 'boolean') {
+                            type = 'boolean';
+                        } else if (Array.isArray(value)) {
+                            type = 'array';
+                        } else if (typeof value === 'object' && value !== null) {
+                            type = 'object';
+                        }
+
+                        lastRow.querySelector('.param-type').value = type;
+
+                        // Set sample value
+                        let sampleValue = '';
+                        if (type === 'object' || type === 'array') {
+                            sampleValue = JSON.stringify(value);
+                        } else {
+                            sampleValue = String(value);
+                        }
+                        lastRow.querySelector('.param-sample').value = sampleValue;
+                    }
+                });
+            });
+        }
+
+        // Update submit button text
+        document.querySelector('#registerForm button[type="submit"]').textContent = 'Update API';
+
+        showToast('Edit mode - Modify fields and click Update API', 'info');
+    } catch (error) {
+        showToast('Error loading API for edit: ' + error.message, 'error');
+    } finally {
+        showLoading(false);
+    }
 }
 
 async function deleteAPI(id) {

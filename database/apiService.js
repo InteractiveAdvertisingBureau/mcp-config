@@ -39,12 +39,16 @@ export async function registerAPI(apiData) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
+  // Handle request_params - avoid double stringification
+  const requestParams = apiData.request_params || {};
+  const requestParamsStr = typeof requestParams === 'string' ? requestParams : JSON.stringify(requestParams);
+
   const params = [
     apiData.name || 'Unnamed API',
     apiData.endpoint,
     apiData.method?.toUpperCase() || 'GET',
     apiData.request_type || 'application/json',
-    JSON.stringify(apiData.request_params || {}),
+    requestParamsStr,
     apiData.description || '',
     apiData.auth_required || false,
     apiData.auth_type || null,
@@ -87,8 +91,12 @@ export async function getAPIById(apiId, includeToken = false) {
 
   if (api && api.request_params) {
     try {
-      api.request_params = JSON.parse(api.request_params);
+      // Check if already parsed (object) or needs parsing (string)
+      if (typeof api.request_params === 'string') {
+        api.request_params = JSON.parse(api.request_params);
+      }
     } catch (e) {
+      console.error(`Failed to parse request_params for API ${apiId}:`, e.message);
       api.request_params = {};
     }
   }
@@ -159,14 +167,45 @@ export async function getAllAPIs(filters = {}, includeToken = false) {
  * Update API
  */
 export async function updateAPI(apiId, updates) {
-  const allowedFields = ['name', 'endpoint', 'method', 'request_type', 'request_params', 'description', 'status'];
+  const allowedFields = ['name', 'endpoint', 'method', 'request_type', 'request_params', 'description', 'status', 'auth_required', 'auth_type', 'auth_token'];
   const setClauses = [];
   const params = [];
 
+  // Get existing API to preserve auth token if not provided
+  const existingApi = await getAPIById(apiId, true); // Include token for internal use
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
-      setClauses.push(`${key} = ?`);
-      params.push(key === 'request_params' ? JSON.stringify(value) : value);
+      // Handle request_params - check if already stringified
+      if (key === 'request_params') {
+        const paramValue = typeof value === 'string' ? value : JSON.stringify(value);
+        setClauses.push(`${key} = ?`);
+        params.push(paramValue);
+      }
+      // Handle auth_token - preserve existing if not provided or empty
+      else if (key === 'auth_token') {
+        if (value === null || value === undefined || value === '') {
+          // Preserve existing token if update value is empty
+          if (existingApi && existingApi.auth_token) {
+            setClauses.push(`${key} = ?`);
+            params.push(existingApi.auth_token);
+          }
+          // If no existing token and no new token, explicitly set to null
+          else {
+            setClauses.push(`${key} = ?`);
+            params.push(null);
+          }
+        } else {
+          // New token provided
+          setClauses.push(`${key} = ?`);
+          params.push(value);
+        }
+      }
+      // Handle other fields normally
+      else {
+        setClauses.push(`${key} = ?`);
+        params.push(value);
+      }
     }
   }
 

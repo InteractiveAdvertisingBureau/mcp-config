@@ -1,28 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Testing System - MCP Integration</title>
+    <title>API Management Tool - MCP Integration</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
         <div class="container">
             <div class="header-content">
                 <div class="logo">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                        <rect width="32" height="32" rx="8" fill="#4F46E5"/>
-                        <path d="M16 8L22 12V20L16 24L10 20V12L16 8Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-                        <circle cx="16" cy="16" r="3" fill="white"/>
-                    </svg>
-                    <h1>API Testing System</h1>
+                    <img src="iab-logo.png" alt="IAB Tech Lab" style="height: 40px; width: auto;">
+                    <h1>MCP Registry</h1>
                 </div>
                 <div class="header-actions">
                     <button class="btn-icon" id="refreshBtn" title="Refresh">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            <path
+                                d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
                         </svg>
                     </button>
                     <div class="status-indicator">
@@ -47,20 +46,20 @@
                 </button>
                 <button class="tab" data-tab="apis">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+                        <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
                     </svg>
                     APIs
                 </button>
                 <button class="tab" data-tab="test">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                     </svg>
                     Test
                 </button>
                 <button class="tab" data-tab="results">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M9 11l3 3L22 4"/>
-                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                     </svg>
                     Results
                 </button>
@@ -114,14 +113,16 @@
 
                             <div class="form-group">
                                 <label for="apiEndpoint">Endpoint URL</label>
-                                <input type="url" id="apiEndpoint" placeholder="https://api.example.com/endpoint" required>
+                                <input type="url" id="apiEndpoint" placeholder="https://api.example.com/endpoint"
+                                    required>
                             </div>
 
                             <div class="form-group">
                                 <label for="apiRequestType">Content Type</label>
                                 <select id="apiRequestType">
                                     <option value="application/json">application/json</option>
-                                    <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+                                    <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded
+                                    </option>
                                     <option value="multipart/form-data">multipart/form-data</option>
                                     <option value="text/plain">text/plain</option>
                                 </select>
@@ -133,13 +134,15 @@
                                     <!-- Parameters will be added here dynamically -->
                                 </div>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="addParameterField()">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
                                         <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg>
                                     Add Parameter
                                 </button>
-                                <small style="display: block; margin-top: 0.5rem;">Define parameters with their types and locations</small>
+                                <small style="display: block; margin-top: 0.5rem;">Define parameters with their types
+                                    and locations</small>
                             </div>
 
                             <div class="form-row">
@@ -152,25 +155,44 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="apiAuthType">Authentication Type</label>
-                                    <select id="apiAuthType" disabled>
+                                    <select id="apiAuthType" disabled onchange="toggleAuthTypeFields()">
                                         <option value="Bearer Token">Bearer Token</option>
                                         <option value="API Key">API Key</option>
                                         <option value="Basic Auth">Basic Auth</option>
-                                        <option value="OAuth">OAuth</option>
-                                        <option value="Custom">Custom</option>
+                                        <!-- <option value="OAuth">OAuth (Coming Soon)</option> -->
+                                        <!-- <option value="Custom">Custom (Coming Soon)</option> -->
                                     </select>
                                 </div>
                             </div>
 
+                            <!-- Token/Key field (for Bearer Token and API Key) -->
                             <div class="form-group" id="authTokenGroup" style="display: none;">
-                                <label for="apiAuthToken">Authentication Token/Key (Optional)</label>
+                                <label for="apiAuthToken">Authentication Token/Key</label>
                                 <input type="text" id="apiAuthToken" placeholder="Enter your API key or token">
-                                <small>This will be used for testing. Leave empty to use placeholder.</small>
+                                <small>This will be used for testing. Leave empty to keep existing token.</small>
+                            </div>
+
+                            <!-- Basic Auth fields (username + password) -->
+                            <div id="basicAuthGroup" style="display: none;">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="apiAuthUsername">Username</label>
+                                        <input type="text" id="apiAuthUsername" placeholder="Enter username">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="apiAuthPassword">Password</label>
+                                        <input type="password" id="apiAuthPassword" placeholder="Enter password">
+                                    </div>
+                                </div>
+                                <small style="display: block; margin-top: -0.5rem; margin-bottom: 1rem;">
+                                    Will be Base64 encoded as: Authorization: Basic &lt;base64(username:password)&gt;
+                                </small>
                             </div>
 
                             <div class="form-group">
                                 <label for="apiDescription">Description</label>
-                                <textarea id="apiDescription" rows="2" placeholder="Brief description of what this API does"></textarea>
+                                <textarea id="apiDescription" rows="2"
+                                    placeholder="Brief description of what this API does"></textarea>
                             </div>
 
                             <div class="form-actions">
@@ -225,7 +247,7 @@
                         </div>
                         <div id="apisEmpty" class="empty-state" style="display: none;">
                             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+                                <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
                             </svg>
                             <h3>No APIs registered yet</h3>
                             <p>Register your first API to get started</p>
@@ -250,37 +272,47 @@
                         </div>
 
                         <!-- API Authentication Status -->
-                        <div id="apiAuthStatus" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+                        <div id="apiAuthStatus"
+                            style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff9800"
+                                    stroke-width="2">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                                 <div>
                                     <strong>Authentication Required</strong>
-                                    <div id="authStatusText" style="font-size: 0.875rem; color: #666; margin-top: 0.25rem;"></div>
+                                    <div id="authStatusText"
+                                        style="font-size: 0.875rem; color: #666; margin-top: 0.25rem;"></div>
                                 </div>
                             </div>
                         </div>
 
                         <div id="testScenarios" style="display: none;">
                             <!-- Temporary Token Input (shown only when auth required) -->
-                            <div id="tempTokenContainer" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <div id="tempTokenContainer"
+                                style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                     <label style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9800"
+                                            stroke-width="2">
                                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                         </svg>
                                         Temporary Test Token
                                     </label>
-                                    <button type="button" class="btn btn-secondary btn-sm" id="clearTokenBtn" onclick="clearTempToken()">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="clearTokenBtn"
+                                        onclick="clearTempToken()">
                                         Clear
                                     </button>
                                 </div>
-                                <input type="text" id="tempTokenInput" placeholder="Enter authentication token for testing (saved locally)" style="width: 100%; padding: 0.625rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <input type="text" id="tempTokenInput"
+                                    placeholder="Enter authentication token for testing (saved locally)"
+                                    style="width: 100%; padding: 0.625rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
                                 <small style="display: block; margin-top: 0.5rem; color: #666;">
-                                    This token is stored in your browser's localStorage and will be used for all tests until cleared.
+                                    This token is stored in your browser's localStorage and will be used for all tests
+                                    until cleared.
                                 </small>
                             </div>
 
@@ -338,8 +370,8 @@
                         <div id="resultsContent"></div>
                         <div id="resultsEmpty" class="empty-state">
                             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M9 11l3 3L22 4"/>
-                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                                <path d="M9 11l3 3L22 4" />
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                             </svg>
                             <h3>No test results</h3>
                             <p>Run tests on your APIs to see results</p>
@@ -379,7 +411,9 @@
                     <div class="card-body">
                         <div id="chatMessages" class="chat-messages"></div>
                         <div class="chat-input-container">
-                            <textarea id="queryInput" placeholder="Ask me anything... e.g., 'Query API 3 and give me a summary' or 'Validate API 2 with auth headers'" rows="2"></textarea>
+                            <textarea id="queryInput"
+                                placeholder="Ask me anything... e.g., 'Query API 3 and give me a summary' or 'Validate API 2 with auth headers'"
+                                rows="2"></textarea>
                             <button type="button" class="btn btn-primary" id="sendQueryBtn">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -390,10 +424,14 @@
                         </div>
                         <div class="query-suggestions">
                             <strong>Try asking:</strong>
-                            <button class="suggestion-btn" data-query="List all registered APIs">List all registered APIs</button>
-                            <button class="suggestion-btn" data-query="Query API 3 with summary">Query API 3 with summary</button>
-                            <button class="suggestion-btn" data-query="Show metadata for all APIs">Show metadata for all APIs</button>
-                            <button class="suggestion-btn" data-query="Validate and execute API 2">Validate and execute API 2</button>
+                            <button class="suggestion-btn" data-query="List all registered APIs">List all registered
+                                APIs</button>
+                            <button class="suggestion-btn" data-query="Query API 3 with summary">Query API 3 with
+                                summary</button>
+                            <button class="suggestion-btn" data-query="Show metadata for all APIs">Show metadata for all
+                                APIs</button>
+                            <button class="suggestion-btn" data-query="Validate and execute API 2">Validate and execute
+                                API 2</button>
                         </div>
                     </div>
                 </div>
@@ -426,4 +464,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

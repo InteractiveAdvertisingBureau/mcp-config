@@ -866,9 +866,11 @@
 
                 // Add AI response to UI
                 if (data.response) {
-                    addMessage('assistant', data.response, false, data.toolCalls);
+                    // Check if this is an error response (conversational error)
+                    const isErrorResponse = data.isError === true;
+                    addMessage('assistant', data.response, isErrorResponse, data.toolCalls);
 
-                    // Save conversation
+                    // Save conversation (even if it's an error, to maintain history)
                     saveCurrentConversation();
                 } else {
                     throw new Error('No response from AI');

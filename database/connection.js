@@ -22,7 +22,12 @@ export function initializeDatabase() {
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 0,
+    // Connection settings
+    connectTimeout: 20000, // 20 seconds to establish initial connection
+    // Pool management
+    maxIdle: 10, // max idle connections (same as connectionLimit)
+    idleTimeout: 60000, // 60 seconds - close idle connections after 1 minute
   };
 
   try {
@@ -67,18 +72,47 @@ export function getPool() {
 }
 
 /**
- * Execute a query
+ * Execute a query with automatic retry on connection errors
  */
-export async function query(sql, params = []) {
-  try {
-    const [results] = await pool.execute(sql, params);
-    return results;
-  } catch (error) {
-    console.error('❌ Database query error:', error.message);
-    console.error('   SQL:', sql);
-    console.error('   Params:', params);
-    throw error;
+export async function query(sql, params = [], retries = 2) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const [results] = await pool.execute(sql, params);
+
+      // Log retry success if this wasn't the first attempt
+      if (attempt > 0) {
+        console.error(`✅ Query succeeded on retry ${attempt}`);
+      }
+
+      return results;
+    } catch (error) {
+      lastError = error;
+
+      // Check if it's a connection error that we should retry
+      const isConnectionError =
+        error.code === 'ECONNRESET' ||
+        error.code === 'PROTOCOL_CONNECTION_LOST' ||
+        error.code === 'ETIMEDOUT' ||
+        error.errno === -54;
+
+      if (isConnectionError && attempt < retries) {
+        console.error(`⚠️ Connection error on attempt ${attempt + 1}, retrying... (${error.code || error.errno})`);
+        // Wait a bit before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+        continue;
+      }
+
+      // Log error and throw if we've exhausted retries or it's not a connection error
+      console.error('❌ Database query error:', error.message);
+      console.error('   SQL:', sql);
+      console.error('   Params:', params);
+      throw error;
+    }
   }
+
+  throw lastError;
 }
 
 /**

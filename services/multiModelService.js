@@ -100,18 +100,43 @@ class MultiModelService {
       requestOptions.response_format = { type: "json_object" };
     }
 
-    const response = await this.openai.chat.completions.create(requestOptions);
+    try {
+      const response = await this.openai.chat.completions.create(requestOptions);
 
-    return {
-      provider: 'openai',
-      model: modelConfig.openai.model,
-      content: response.choices[0].message.content,
-      usage: {
-        promptTokens: response.usage.prompt_tokens,
-        completionTokens: response.usage.completion_tokens,
-        totalTokens: response.usage.total_tokens
+      return {
+        provider: 'openai',
+        model: modelConfig.openai.model,
+        content: response.choices[0].message.content,
+        usage: {
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens
+        }
+      };
+    } catch (error) {
+      // Handle context length errors with user-friendly messages
+      if (error.message && error.message.includes('maximum context length')) {
+        const match = error.message.match(/maximum context length is (\d+) tokens/);
+        const maxTokens = match ? match[1] : 'unknown';
+        const usedMatch = error.message.match(/resulted in (\d+) tokens/);
+        const usedTokens = usedMatch ? usedMatch[1] : 'unknown';
+
+        throw new Error(`Context limit exceeded: This request uses ${usedTokens} tokens, but the model's maximum is ${maxTokens} tokens. Please reduce the size of your input or conversation history.`);
       }
-    };
+
+      // Handle rate limit errors
+      if (error.status === 429 || (error.message && error.message.includes('rate limit'))) {
+        throw new Error('Rate limit exceeded: Too many requests. Please try again in a moment.');
+      }
+
+      // Handle API key errors
+      if (error.status === 401 || (error.message && error.message.includes('Incorrect API key'))) {
+        throw new Error('Authentication failed: Invalid or missing API key. Please check your configuration.');
+      }
+
+      // Re-throw other errors with context
+      throw new Error(`OpenAI API error: ${error.message || 'Unknown error occurred'}`);
+    }
   }
 
   /**
@@ -129,20 +154,40 @@ class MultiModelService {
       }
     });
 
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
+    try {
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
 
-    return {
-      provider: 'gemini',
-      model: modelConfig.gemini.model,
-      content: text,
-      usage: {
-        promptTokens: response.usageMetadata?.promptTokenCount || 0,
-        completionTokens: response.usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: response.usageMetadata?.totalTokenCount || 0
+      return {
+        provider: 'gemini',
+        model: modelConfig.gemini.model,
+        content: text,
+        usage: {
+          promptTokens: response.usageMetadata?.promptTokenCount || 0,
+          completionTokens: response.usageMetadata?.candidatesTokenCount || 0,
+          totalTokens: response.usageMetadata?.totalTokenCount || 0
+        }
+      };
+    } catch (error) {
+      // Handle context length errors
+      if (error.message && (error.message.includes('context length') || error.message.includes('token limit'))) {
+        throw new Error('Context limit exceeded: The input is too large for the model. Please reduce the size of your input or conversation history.');
       }
-    };
+
+      // Handle rate limit errors
+      if (error.status === 429 || (error.message && error.message.includes('quota'))) {
+        throw new Error('Rate limit exceeded: Too many requests or quota exhausted. Please try again later.');
+      }
+
+      // Handle API key errors
+      if (error.status === 401 || error.status === 403 || (error.message && error.message.includes('API key'))) {
+        throw new Error('Authentication failed: Invalid or missing API key. Please check your configuration.');
+      }
+
+      // Re-throw other errors with context
+      throw new Error(`Gemini API error: ${error.message || 'Unknown error occurred'}`);
+    }
   }
 
   /**

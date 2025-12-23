@@ -5,6 +5,50 @@ import * as apiTester from '../services/apiTester.js';
 import { validateDomain, rateLimit } from '../middleware/validationMiddleware.js';
 import { multiModelService } from '../services/multiModelService.js';
 
+/**
+ * Helper function to handle errors and return appropriate HTTP status codes
+ */
+function handleError(res, error, defaultMessage = 'Internal Server Error') {
+  console.error('Error:', error);
+
+  // Determine appropriate status code and user-friendly message
+  let statusCode = 500;
+  let errorType = defaultMessage;
+  let userMessage = error.message || defaultMessage;
+
+  // Context length / token limit errors
+  if (error.message && (error.message.includes('Context limit exceeded') || error.message.includes('maximum context length'))) {
+    statusCode = 413; // Payload Too Large
+    errorType = 'Context Limit Exceeded';
+  }
+  // Rate limit errors
+  else if (error.message && error.message.includes('Rate limit exceeded')) {
+    statusCode = 429; // Too Many Requests
+    errorType = 'Rate Limit Exceeded';
+  }
+  // Authentication errors
+  else if (error.message && (error.message.includes('Authentication failed') || error.message.includes('Invalid API key'))) {
+    statusCode = 401; // Unauthorized
+    errorType = 'Authentication Error';
+  }
+  // Validation errors
+  else if (error.message && (error.message.includes('Bad Request') || error.message.includes('Invalid'))) {
+    statusCode = 400; // Bad Request
+    errorType = 'Validation Error';
+  }
+  // Not found errors
+  else if (error.message && error.message.includes('not found')) {
+    statusCode = 404; // Not Found
+    errorType = 'Not Found';
+  }
+
+  return res.status(statusCode).json({
+    error: errorType,
+    message: userMessage,
+    success: false
+  });
+}
+
 // Apply rate limiting
 router.use(rateLimit(100, 60000)); // 100 requests per minute
 
@@ -26,11 +70,44 @@ router.post("/register", async (req, res) => {
   try {
     const { name, endpoint, method, request_type, request_params, description, auth_required, auth_type, auth_token } = req.body;
 
+    // Validation
     if (!endpoint) {
       return res.status(400).json({
         error: "Bad Request",
         message: "endpoint is required"
       });
+    }
+
+    // Validate endpoint URL format
+    try {
+      new URL(endpoint);
+    } catch (urlError) {
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "Invalid endpoint URL format"
+      });
+    }
+
+    // Validate auth fields if auth is required
+    if (auth_required) {
+      if (!auth_type) {
+        return res.status(400).json({
+          error: "Bad Request",
+          message: "auth_type is required when auth_required is true"
+        });
+      }
+
+      const validAuthTypes = ['Bearer Token', 'API Key', 'Basic Auth', 'OAuth'];
+      if (!validAuthTypes.includes(auth_type)) {
+        return res.status(400).json({
+          error: "Bad Request",
+          message: `Invalid auth_type. Must be one of: ${validAuthTypes.join(', ')}`
+        });
+      }
+
+      if (!auth_token) {
+        console.warn(`⚠️  Warning: auth_required is true but no auth_token provided`);
+      }
     }
 
     console.log(`📝 Registering API: ${name || endpoint}`);
@@ -105,11 +182,7 @@ router.post("/register", async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error registering API:', error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error.message
-    });
+    return handleError(res, error, 'Registration Error');
   }
 });
 
@@ -144,17 +217,27 @@ router.get("/apis", async (req, res) => {
 /**
  * GET /api/apis/:id
  * Get specific API by ID
+ * Query param: includeToken=true for internal edit operations (includes masked token indicator)
  */
 router.get("/apis/:id", async (req, res) => {
   try {
     const apiId = parseInt(req.params.id);
-    const api = await apiService.getAPIById(apiId);
+    const includeTokenForEdit = req.query.includeToken === 'true';
+
+    // Get API - if includeToken=true, we return with token (for edit form)
+    const api = await apiService.getAPIById(apiId, includeTokenForEdit);
 
     if (!api) {
       return res.status(404).json({
         error: "Not Found",
         message: `API with ID ${apiId} not found`
       });
+    }
+
+    // If including token for edit, indicate token exists without exposing it
+    if (includeTokenForEdit && api.auth_token) {
+      api.auth_token_exists = true;
+      api.auth_token = ''; // Don't send actual token to frontend
     }
 
     res.json({
@@ -451,11 +534,7 @@ Respond in JSON format:
       });
     }
   } catch (error) {
-    console.error('Error generating sample data:', error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error.message
-    });
+    return handleError(res, error, 'Sample Data Generation Error');
   }
 });
 
@@ -638,11 +717,7 @@ Provide:
       model_used: aiResponse.provider || 'default'
     });
   } catch (error) {
-    console.error('Error in query with summary:', error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error.message
-    });
+    return handleError(res, error, 'Query Error');
   }
 });
 
@@ -1014,11 +1089,7 @@ Response:`;
     });
 
   } catch (error) {
-    console.error('Error in AI query:', error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error.message
-    });
+    return handleError(res, error, 'AI Query Error');
   }
 });
 

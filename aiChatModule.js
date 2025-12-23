@@ -259,12 +259,38 @@ async function callOpenAIAPI(messages) {
         }
     }));
 
-    let response = await aiClient.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: openaiMessages,
-        tools,
-        max_tokens: 4096
-    });
+    let response;
+    try {
+        response = await aiClient.chat.completions.create({
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            messages: openaiMessages,
+            tools,
+            max_tokens: 4096
+        });
+    } catch (error) {
+        // Handle context length errors with user-friendly messages
+        if (error.message && error.message.includes('maximum context length')) {
+            const match = error.message.match(/maximum context length is (\d+) tokens/);
+            const maxTokens = match ? match[1] : 'unknown';
+            const usedMatch = error.message.match(/resulted in (\d+) tokens/);
+            const usedTokens = usedMatch ? usedMatch[1] : 'unknown';
+
+            throw new Error(`Context limit exceeded: This request uses ${usedTokens} tokens, but the model's maximum is ${maxTokens} tokens. Please reduce the size of your input or conversation history.`);
+        }
+
+        // Handle rate limit errors
+        if (error.status === 429 || (error.message && error.message.includes('rate limit'))) {
+            throw new Error('Rate limit exceeded: Too many requests. Please try again in a moment.');
+        }
+
+        // Handle API key errors
+        if (error.status === 401 || (error.message && error.message.includes('Incorrect API key'))) {
+            throw new Error('Authentication failed: Invalid or missing API key. Please check your configuration.');
+        }
+
+        // Re-throw other errors with context
+        throw new Error(`OpenAI API error: ${error.message || 'Unknown error occurred'}`);
+    }
 
     const toolCalls = [];
     let responseMessage = response.choices[0].message;
@@ -294,14 +320,32 @@ async function callOpenAIAPI(messages) {
         }
 
         // Get next response after ALL tools have been executed
-        response = await aiClient.chat.completions.create({
-            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-            messages: openaiMessages,
-            tools,
-            max_tokens: 4096
-        });
+        try {
+            response = await aiClient.chat.completions.create({
+                model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+                messages: openaiMessages,
+                tools,
+                max_tokens: 4096
+            });
 
-        responseMessage = response.choices[0].message;
+            responseMessage = response.choices[0].message;
+        } catch (error) {
+            // Handle errors in follow-up calls the same way
+            if (error.message && error.message.includes('maximum context length')) {
+                const match = error.message.match(/maximum context length is (\d+) tokens/);
+                const maxTokens = match ? match[1] : 'unknown';
+                const usedMatch = error.message.match(/resulted in (\d+) tokens/);
+                const usedTokens = usedMatch ? usedMatch[1] : 'unknown';
+                throw new Error(`Context limit exceeded: This request uses ${usedTokens} tokens, but the model's maximum is ${maxTokens} tokens. Please reduce the size of your input or conversation history.`);
+            }
+            if (error.status === 429 || (error.message && error.message.includes('rate limit'))) {
+                throw new Error('Rate limit exceeded: Too many requests. Please try again in a moment.');
+            }
+            if (error.status === 401 || (error.message && error.message.includes('Incorrect API key'))) {
+                throw new Error('Authentication failed: Invalid or missing API key. Please check your configuration.');
+            }
+            throw new Error(`OpenAI API error: ${error.message || 'Unknown error occurred'}`);
+        }
     }
 
     const responseText = responseMessage.content || 'I apologize, but I could not generate a response.';
@@ -535,9 +579,49 @@ export async function setupAIChat(app, options = {}) {
 
         } catch (error) {
             console.error('❌ AI Chat Error:', error);
-            res.status(500).json({
-                error: 'Internal server error',
-                message: error.message
+
+            // Instead of returning error JSON, return a conversational error response
+            // This makes errors feel natural, like ChatGPT/Claude would respond
+            let conversationalResponse = '';
+            let statusCode = 200; // Always return 200 for conversational errors
+
+            // Context length / token limit errors
+            if (error.message && (error.message.includes('Context limit exceeded') || error.message.includes('maximum context length') || error.message.includes('token limit'))) {
+                // Extract token information if available
+                const maxMatch = error.message.match(/maximum is (\d+) tokens/);
+                const usedMatch = error.message.match(/uses (\d+) tokens/);
+
+                if (maxMatch && usedMatch) {
+                    const maxTokens = parseInt(maxMatch[1]).toLocaleString();
+                    const usedTokens = parseInt(usedMatch[1]).toLocaleString();
+                    conversationalResponse = `I apologize, but our conversation has become too long. We've used ${usedTokens} tokens, which exceeds the ${maxTokens} token limit.\n\nTo continue, please start a new conversation using the "New Chat" button. This will give us a fresh start while keeping our previous conversation in your history.\n\nIs there anything specific from our discussion that you'd like me to help you with in a new conversation?`;
+                } else {
+                    conversationalResponse = `I apologize, but our conversation has grown too long and I'm unable to process it further due to context length limits.\n\nPlease start a new conversation using the "New Chat" button, and I'll be happy to continue helping you. You can reference specific parts of our previous discussion if needed.\n\nWhat would you like to explore in our next conversation?`;
+                }
+            }
+            // Rate limit errors
+            else if (error.message && (error.message.includes('Rate limit exceeded') || error.message.includes('rate limit'))) {
+                conversationalResponse = `I apologize, but I'm currently experiencing high demand and need a moment to catch up.\n\nPlease wait about 30 seconds and try sending your message again. I'll be ready to help you shortly!\n\nThank you for your patience. 🙏`;
+            }
+            // Authentication errors
+            else if (error.message && (error.message.includes('Authentication failed') || error.message.includes('API key') || error.message.includes('Incorrect API key'))) {
+                conversationalResponse = `I apologize, but I'm having trouble connecting to my AI service due to a configuration issue.\n\nThis is a technical problem on our end. Please contact support or try again later.\n\nI'm sorry for the inconvenience!`;
+            }
+            // API provider errors
+            else if (error.message && (error.message.includes('OpenAI API error') || error.message.includes('Gemini API error') || error.message.includes('Anthropic API error'))) {
+                conversationalResponse = `I apologize, but I encountered an error while processing your request.\n\nThe AI service reported: ${error.message.replace(/^(OpenAI|Gemini|Anthropic) API error:\s*/i, '')}\n\nPlease try again in a moment. If the issue persists, you may want to start a new conversation.`;
+            }
+            // Generic errors
+            else {
+                conversationalResponse = `I apologize, but I encountered an unexpected error while processing your request.\n\n${error.message || 'An unknown error occurred.'}\n\nPlease try again, or start a new conversation if the problem continues.`;
+            }
+
+            // Return as a normal chat response, not an error
+            res.status(statusCode).json({
+                response: conversationalResponse,
+                toolCalls: [],
+                usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+                isError: true // Flag for frontend to style differently if needed
             });
         }
     });
