@@ -8,6 +8,9 @@
         "start": "node server.js",
         "mcp": "node mcpServer.js",
         "mcp:http": "node mcpServerHttp.js",
+        "mcp:agentic": "node mcpServerAgentic.js",
+        "mcp:schema": "node mcpServerSchemaDriven.js",
+        "mcp:schema-stdio": "node mcpServerSchemaDrivenStdio.js",
         "dev": "node --watch server.js",
         "test:mcp": "node test-mcp-connection.js",
         "setup-auth": "node setup-api-keys.js"

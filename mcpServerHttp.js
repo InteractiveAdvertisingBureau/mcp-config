@@ -562,7 +562,7 @@ function createMCPServer() {
 
             // Check auth requirements
             if (recommendations.authorization_required &&
-                (!args.headers || !args.headers.Authorization)) {
+              (!args.headers || !args.headers.Authorization)) {
               validationWarnings.push({
                 type: 'auth_missing',
                 message: 'This API requires authorization but no Authorization header provided',
@@ -789,7 +789,7 @@ export function createMCPHttpApp() {
 
   const server = createMCPServer();
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined // Stateless
+    sessionIdGenerator: undefined // Stateless mode
   });
 
   server.connect(transport).then(() => {
@@ -798,7 +798,7 @@ export function createMCPHttpApp() {
     console.error('❌ MCP server connection failed:', error);
   });
 
-  // MCP endpoint
+  // MCP endpoint - handles both GET (SSE) and POST (messages) via handleRequest
   app.all('/sse', async (req, res) => {
     await transport.handleRequest(req, res, req.body);
   });

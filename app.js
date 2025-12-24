@@ -52,11 +52,21 @@ app.use(express.static(path.join(__dirname, 'storage')));
 
 import mcpRoutes from './routes/mcpRoutes.js';
 import { createMCPHttpApp } from './mcpServerHttp.js';
+import { createAgenticMCPHttpApp } from './mcpServerHttpAgentic.js';
+import { createSchemaDrivenMCPApp } from './mcpServerSchemaDriven.js';
 import { setupAIChat } from './aiChatModule.js';
 
-// MCP server without authentication
+// MCP server for API testing tools
 const mcpApp = createMCPHttpApp();
 app.use('/mcp', mcpApp);
+
+// AgenticDirect MCP server for OpenDirect v2.1 tools (10 manual tools)
+const agenticMcpApp = createAgenticMCPHttpApp();
+app.use('/agenticdirect/mcp', agenticMcpApp);
+
+// Schema-Driven MCP server for OpenDirect v2.1 (33 auto-generated tools)
+const schemaMcpApp = createSchemaDrivenMCPApp();
+app.use('/schema/mcp', schemaMcpApp);
 
 // Mount REST API BEFORE catch-all route
 app.use('/api', mcpRoutes);
