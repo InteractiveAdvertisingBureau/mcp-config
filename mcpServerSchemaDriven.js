@@ -184,6 +184,17 @@ export function createSchemaDrivenMCPApp() {
 
   const server = createSchemaDrivenMCPServer();
 
+  // Load config for REST API endpoints
+  const config = loadConfig({
+    implementation: 'nodejs-schema-driven'
+  });
+
+  // Generate tool handlers and definitions for REST endpoints
+  const toolHandlers = generateCRUDTools(config.schemas, storage);
+  const toolHandlersMap = new Map(toolHandlers.map(t => [t.name, t.handler]));
+  const toolDefinitions = generateToolDefinitions(config.schemas);
+  const resourceDefinitions = generateResourceDefinitions(config.schemas);
+
   // Create single transport instance
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined // Stateless
@@ -220,7 +231,9 @@ export function createSchemaDrivenMCPApp() {
       endpoints: {
         sse: '/schema/mcp/sse',
         health: '/schema/mcp/health',
-        info: '/schema/mcp/info'
+        info: '/schema/mcp/info',
+        tools: '/schema/mcp/tools',
+        resources: '/schema/mcp/resources'
       },
       tools: {
         total: 33,
@@ -252,6 +265,97 @@ export function createSchemaDrivenMCPApp() {
         'Single source of truth (schema files)',
         'Type-safe operations with JSON Schema validation'
       ]
+    });
+  });
+
+  // ============================================
+  // REST API ENDPOINTS (Python Client Compatibility)
+  // ============================================
+
+  // GET /tools - List all available tools
+  app.get('/tools', (req, res) => {
+    console.log('📋 REST API: GET /tools');
+    res.json({
+      tools: toolDefinitions.map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema
+      }))
+    });
+  });
+
+  // POST /tools/:tool_name - Execute a tool
+  app.post('/tools/:tool_name', async (req, res) => {
+    const toolName = req.params.tool_name;
+    const args = req.body;
+
+    console.log(`🔧 REST API: POST /tools/${toolName}`, args);
+
+    try {
+      // Get handler
+      const handler = toolHandlersMap.get(toolName);
+      if (!handler) {
+        return res.status(404).json({
+          error: 'Tool not found',
+          message: `Unknown tool: ${toolName}`,
+          available_tools: Array.from(toolHandlersMap.keys())
+        });
+      }
+
+      // Execute tool
+      const result = await handler(args);
+
+      // Return result
+      res.json({
+        success: true,
+        tool: toolName,
+        result: result
+      });
+    } catch (error) {
+      console.error(`❌ Tool execution error:`, error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        tool: toolName
+      });
+    }
+  });
+
+  // GET /resources - List all available resources
+  app.get('/resources', (req, res) => {
+    console.log('📦 REST API: GET /resources');
+    res.json({
+      resources: resourceDefinitions.map(resource => ({
+        uri: resource.uri,
+        name: resource.name,
+        description: resource.description,
+        mimeType: resource.mimeType
+      }))
+    });
+  });
+
+  // GET /resources/:resource_type - Get resource data
+  app.get('/resources/:resource_type', (req, res) => {
+    const resourceType = req.params.resource_type;
+    console.log(`📦 REST API: GET /resources/${resourceType}`);
+
+    // Map resource type to storage key
+    const storageKey = resourceType.toLowerCase();
+
+    if (!storage[storageKey]) {
+      return res.status(404).json({
+        error: 'Resource not found',
+        message: `Unknown resource type: ${resourceType}`,
+        available_resources: Object.keys(storage)
+      });
+    }
+
+    const items = Object.values(storage[storageKey]);
+    res.json({
+      resource: resourceType,
+      uri: `opendirect://${storageKey}`,
+      count: items.length,
+      items: items
     });
   });
 

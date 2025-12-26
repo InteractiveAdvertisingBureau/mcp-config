@@ -126,10 +126,29 @@ npm start
 
 **Documentation:** [docs/SCHEMA_DRIVEN_GUIDE.md](./docs/SCHEMA_DRIVEN_GUIDE.md)
 
-**Endpoints (HTTP mode):**
-- SSE: `http://localhost:3000/agenticdirect/mcp/sse`
-- Message: `http://localhost:3000/agenticdirect/mcp/message`
-- Health: `http://localhost:3000/agenticdirect/health`
+**Endpoints (when running `npm start`):**
+- SSE: `http://localhost:3000/schema/mcp/sse`
+- Health: `http://localhost:3000/schema/mcp/health`
+- Info: `http://localhost:3000/schema/mcp/info`
+- **REST API (Python client compatible):**
+  - `GET /schema/mcp/tools` - List all tools
+  - `POST /schema/mcp/tools/:tool_name` - Execute a tool
+  - `GET /schema/mcp/resources` - List all resources
+  - `GET /schema/mcp/resources/:resource_type` - Get resource data
+
+**REST API Examples:**
+```bash
+# List all tools
+curl http://localhost:3000/schema/mcp/tools
+
+# Create an organization
+curl -X POST http://localhost:3000/schema/mcp/tools/create_organization \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test Advertiser Inc", "contacts": [{"email": "test@example.com", "name": "John Doe"}]}'
+
+# Get all organizations
+curl http://localhost:3000/schema/mcp/resources/organizations
+```
 
 **Claude Desktop Config (stdio):**
 ```json

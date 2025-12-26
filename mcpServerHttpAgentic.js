@@ -1,5 +1,5 @@
 // MCP HTTP Server for AgenticDirect (OpenDirect v2.1)
-// Converted from Python OpenDirect MCP Server
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
@@ -215,8 +215,8 @@ function createAgenticMCPServer() {
               type: 'string',
               description: 'New booking status',
               enum: ['Draft', 'PendingReservation', 'Reserved', 'PendingBooking', 'Booked',
-                     'InFlight', 'Finished', 'Stopped', 'Canceled', 'Pause', 'Expired',
-                     'Declined', 'ChangePending']
+                'InFlight', 'Finished', 'Stopped', 'Canceled', 'Pause', 'Expired',
+                'Declined', 'ChangePending']
             }
           },
           required: ['line_id', 'booking_status']
