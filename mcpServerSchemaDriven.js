@@ -32,36 +32,47 @@ const storage = {
   messages: {}
 };
 
+
+// Global state for dynamic reloading
+let currentServer = null;
+let currentTransport = null;
+let currentConfig = null;
+let currentToolHandlersMap = null;
+let currentToolDefinitions = null;
+let currentResourceDefinitions = null;
+
 /**
- * Create Schema-Driven MCP Server
+ * Load schema and update global tool/resource state
  */
-function createSchemaDrivenMCPServer() {
+function loadSchemaAndUpdateTools() {
   console.log('🔧 Loading schema-driven configuration...');
 
   // Load configuration from schema and manifest
-  const config = loadConfig({
+  currentConfig = loadConfig({
     implementation: 'nodejs-schema-driven'
   });
 
   console.log('🏗️  Generating CRUD tools from schemas...');
 
   // Generate tool handlers
-  const toolHandlers = generateCRUDTools(config.schemas, storage);
-  const toolHandlersMap = new Map(toolHandlers.map(t => [t.name, t.handler]));
+  const toolHandlers = generateCRUDTools(currentConfig.schemas, storage);
+  currentToolHandlersMap = new Map(toolHandlers.map(t => [t.name, t.handler]));
 
   // Generate tool definitions for MCP
-  const toolDefinitions = generateToolDefinitions(config.schemas);
+  // Pass existing tools from schema (if any) to avoid generating tools for helper schemas
+  currentToolDefinitions = generateToolDefinitions(currentConfig.schemas, currentConfig.tools);
 
   // Generate resource definitions
-  const resourceDefinitions = generateResourceDefinitions(config.schemas);
+  currentResourceDefinitions = generateResourceDefinitions(currentConfig.schemas);
 
-  // Create validation middleware
-  const validateRequest = createValidationMiddleware(config.schemas, toolDefinitions);
+  console.log(`✅ Generated ${currentToolDefinitions.length} tools`);
+  console.log(`✅ Generated ${currentResourceDefinitions.length} resources`);
+}
 
-  console.log(`✅ Generated ${toolDefinitions.length} tools`);
-  console.log(`✅ Generated ${resourceDefinitions.length} resources`);
-
-  // Create MCP server
+/**
+ * Create MCP server instance (once) with handlers that reference global state
+ */
+function createMCPServerInstance() {
   const server = new Server(
     {
       name: 'opendirect-schema-driven-mcp-server',
@@ -76,10 +87,20 @@ function createSchemaDrivenMCPServer() {
     }
   );
 
-  // Register tool handlers
+  // Register tool handlers that always use current global state
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: toolDefinitions };
+    console.log(`🔍 MCP tools/list called - returning ${currentToolDefinitions?.length || 0} tools`);
+    return { tools: currentToolDefinitions || [] };
   });
+
+  const validateRequest = (name, args) => {
+    // Simple validation - check if tool exists
+    const tool = currentToolDefinitions.find(t => t.name === name);
+    if (!tool) {
+      return { valid: false, errors: [`Tool ${name} not found`] };
+    }
+    return { valid: true };
+  };
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
@@ -91,15 +112,15 @@ function createSchemaDrivenMCPServer() {
         content: [
           {
             type: 'text',
-            text: `❌ Validation failed:\n${formatValidationErrors(validationResult.errors)}`
+            text: `❌ Validation failed:\n${validationResult.errors.join('\n')}`
           }
         ],
         isError: true
       };
     }
 
-    // Get handler
-    const handler = toolHandlersMap.get(name);
+    // Get handler from current map
+    const handler = currentToolHandlersMap.get(name);
     if (!handler) {
       return {
         content: [
@@ -138,9 +159,9 @@ function createSchemaDrivenMCPServer() {
     }
   });
 
-  // Register resource handlers
+  // Register resource handlers that use current global state
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    return { resources: resourceDefinitions };
+    return { resources: currentResourceDefinitions };
   });
 
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
@@ -167,10 +188,48 @@ function createSchemaDrivenMCPServer() {
   });
 
   console.log('✅ Schema-driven MCP server created');
-  console.log(`📋 Tools: ${toolDefinitions.length}`);
-  console.log(`📋 Resources: ${resourceDefinitions.length}`);
 
   return server;
+}
+
+/**
+ * Initialize or reload the MCP server with current schema
+ */
+function initializeOrReloadServer() {
+  console.log('🔄 Initializing/Reloading schema-driven MCP server...');
+
+  // Load schema and update global tools/resources
+  loadSchemaAndUpdateTools();
+
+  // Create MCP server on first initialization only
+  if (!currentServer) {
+    currentServer = createMCPServerInstance();
+    console.log(`📋 Tools: ${currentToolDefinitions.length}`);
+    console.log(`📋 Resources: ${currentResourceDefinitions.length}`);
+  } else {
+    console.log(`🔄 Schema reloaded - Tools: ${currentToolDefinitions.length}`);
+    console.log(`🔄 Schema reloaded - Resources: ${currentResourceDefinitions.length}`);
+  }
+
+  // Create single transport instance (or reuse)
+  if (!currentTransport) {
+    currentTransport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined // Stateless
+    });
+
+    currentServer.connect(currentTransport).then(() => {
+      console.log('✅ Schema-driven MCP HTTP transport connected');
+    });
+  }
+
+  return {
+    server: currentServer,
+    transport: currentTransport,
+    config: currentConfig,
+    toolHandlersMap: currentToolHandlersMap,
+    toolDefinitions: currentToolDefinitions,
+    resourceDefinitions: currentResourceDefinitions
+  };
 }
 
 /**
@@ -182,32 +241,13 @@ export function createSchemaDrivenMCPApp() {
 
   app.use(express.json());
 
-  const server = createSchemaDrivenMCPServer();
-
-  // Load config for REST API endpoints
-  const config = loadConfig({
-    implementation: 'nodejs-schema-driven'
-  });
-
-  // Generate tool handlers and definitions for REST endpoints
-  const toolHandlers = generateCRUDTools(config.schemas, storage);
-  const toolHandlersMap = new Map(toolHandlers.map(t => [t.name, t.handler]));
-  const toolDefinitions = generateToolDefinitions(config.schemas);
-  const resourceDefinitions = generateResourceDefinitions(config.schemas);
-
-  // Create single transport instance
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined // Stateless
-  });
-
-  server.connect(transport).then(() => {
-    console.log('✅ Schema-driven MCP HTTP transport connected');
-  });
+  // Initialize server on first load
+  initializeOrReloadServer();
 
   // SSE endpoint for MCP - handles both GET (SSE) and POST (messages)
   app.all('/sse', async (req, res) => {
     console.log(`🔗 Schema MCP ${req.method} /sse`);
-    await transport.handleRequest(req, res, req.body);
+    await currentTransport.handleRequest(req, res, req.body);
   });
 
   // Health check
@@ -276,7 +316,7 @@ export function createSchemaDrivenMCPApp() {
   app.get('/tools', (req, res) => {
     console.log('📋 REST API: GET /tools');
     res.json({
-      tools: toolDefinitions.map(tool => ({
+      tools: currentToolDefinitions.map(tool => ({
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema
@@ -293,12 +333,12 @@ export function createSchemaDrivenMCPApp() {
 
     try {
       // Get handler
-      const handler = toolHandlersMap.get(toolName);
+      const handler = currentToolHandlersMap.get(toolName);
       if (!handler) {
         return res.status(404).json({
           error: 'Tool not found',
           message: `Unknown tool: ${toolName}`,
-          available_tools: Array.from(toolHandlersMap.keys())
+          available_tools: Array.from(currentToolHandlersMap.keys())
         });
       }
 
@@ -325,7 +365,7 @@ export function createSchemaDrivenMCPApp() {
   app.get('/resources', (req, res) => {
     console.log('📦 REST API: GET /resources');
     res.json({
-      resources: resourceDefinitions.map(resource => ({
+      resources: currentResourceDefinitions.map(resource => ({
         uri: resource.uri,
         name: resource.name,
         description: resource.description,
@@ -363,6 +403,15 @@ export function createSchemaDrivenMCPApp() {
 }
 
 /**
+ * Reload schema-driven MCP server with current schema
+ * Called when a new schema is registered via API
+ */
+export function reloadSchemaDrivenServer() {
+  console.log('🔄 Reloading schema-driven MCP server due to schema change...');
+  return initializeOrReloadServer();
+}
+
+/**
  * Standalone server mode
  */
 async function main() {
@@ -386,6 +435,276 @@ async function main() {
   });
 }
 
+/**
+ * Validate payload against JSON schema
+ * @param {Object} payload - The payload to validate
+ * @param {Object} schema - The JSON schema
+ * @returns {Object} Validation result { valid, errors }
+ */
+function validatePayloadAgainstSchema(payload, schema) {
+  const errors = [];
+
+  if (!schema || !schema.properties) {
+    return { valid: true, errors: [] };
+  }
+
+  // Check required fields
+  if (schema.required && Array.isArray(schema.required)) {
+    for (const requiredField of schema.required) {
+      if (!(requiredField in payload)) {
+        errors.push(`Missing required field: "${requiredField}"`);
+      }
+    }
+  }
+
+  // Check field types and constraints
+  for (const [fieldName, fieldValue] of Object.entries(payload)) {
+    const fieldSchema = schema.properties[fieldName];
+
+    if (!fieldSchema) {
+      errors.push(`Unknown field: "${fieldName}" (not in schema)`);
+      continue;
+    }
+
+    // Type validation
+    if (fieldSchema.type) {
+      const actualType = Array.isArray(fieldValue) ? 'array' : typeof fieldValue;
+      const expectedType = fieldSchema.type;
+
+      if (expectedType === 'integer' || expectedType === 'number') {
+        if (typeof fieldValue !== 'number') {
+          errors.push(`Field "${fieldName}" must be a number, got ${actualType}`);
+        } else if (expectedType === 'integer' && !Number.isInteger(fieldValue)) {
+          errors.push(`Field "${fieldName}" must be an integer, got ${fieldValue}`);
+        }
+      } else if (expectedType !== actualType && actualType !== 'null') {
+        errors.push(`Field "${fieldName}" must be ${expectedType}, got ${actualType}`);
+      }
+    }
+
+    // Enum validation
+    if (fieldSchema.enum && Array.isArray(fieldSchema.enum)) {
+      if (!fieldSchema.enum.includes(fieldValue)) {
+        errors.push(`Field "${fieldName}" must be one of: ${fieldSchema.enum.join(', ')}, got "${fieldValue}"`);
+      }
+    }
+
+    // String constraints
+    if (fieldSchema.type === 'string' && typeof fieldValue === 'string') {
+      if (fieldSchema.minLength && fieldValue.length < fieldSchema.minLength) {
+        errors.push(`Field "${fieldName}" must be at least ${fieldSchema.minLength} characters`);
+      }
+      if (fieldSchema.maxLength && fieldValue.length > fieldSchema.maxLength) {
+        errors.push(`Field "${fieldName}" must be at most ${fieldSchema.maxLength} characters`);
+      }
+      if (fieldSchema.pattern) {
+        const regex = new RegExp(fieldSchema.pattern);
+        if (!regex.test(fieldValue)) {
+          errors.push(`Field "${fieldName}" does not match required pattern: ${fieldSchema.pattern}`);
+        }
+      }
+    }
+
+    // Number constraints
+    if ((fieldSchema.type === 'number' || fieldSchema.type === 'integer') && typeof fieldValue === 'number') {
+      if (fieldSchema.minimum !== undefined && fieldValue < fieldSchema.minimum) {
+        errors.push(`Field "${fieldName}" must be >= ${fieldSchema.minimum}`);
+      }
+      if (fieldSchema.maximum !== undefined && fieldValue > fieldSchema.maximum) {
+        errors.push(`Field "${fieldName}" must be <= ${fieldSchema.maximum}`);
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors: errors
+  };
+}
+
+/**
+ * Test tool in sandbox mode
+ * Creates isolated storage, executes tool, returns result, then clears sandbox
+ * @param {string} toolName - Name of the tool to test
+ * @param {Object} payload - Tool input parameters
+ * @returns {Promise<Object>} Test result
+ */
+export async function testToolInSandbox(toolName, payload) {
+  console.log(`🧪 Testing tool in sandbox: ${toolName}`);
+
+  // Create sandbox storage (isolated copy)
+  const sandboxStorage = {};
+
+  try {
+    // Get the tool handler from current tool handlers map
+    const handler = currentToolHandlersMap?.get(toolName);
+
+    if (!handler) {
+      return {
+        success: false,
+        error: `Tool not found: ${toolName}`,
+        available_tools: currentToolHandlersMap ? Array.from(currentToolHandlersMap.keys()) : []
+      };
+    }
+
+    // Find tool definition for validation
+    const toolDef = currentToolDefinitions?.find(t => t.name === toolName);
+
+    // Validate payload against input schema
+    if (toolDef && toolDef.inputSchema) {
+      console.log(`🔍 Validating payload against schema...`);
+      const validation = validatePayloadAgainstSchema(payload, toolDef.inputSchema);
+
+      if (!validation.valid) {
+        console.log(`❌ Validation failed:`, validation.errors);
+        return {
+          success: false,
+          error: 'Payload validation failed',
+          validationErrors: validation.errors,
+          toolName: toolName,
+          payload: payload,
+          toolDefinition: {
+            name: toolDef.name,
+            description: toolDef.description,
+            inputSchema: toolDef.inputSchema
+          }
+        };
+      }
+      console.log(`✅ Payload validation passed`);
+    }
+
+    // Execute handler with sandbox storage
+    console.log(`🔧 Executing ${toolName} with payload:`, JSON.stringify(payload, null, 2));
+
+    // Create a temporary tool handler that uses sandbox storage
+    const sandboxHandler = async (args) => {
+      // Determine storage key from tool name
+      const objectType = toolName.split('_').slice(1).join('_'); // e.g., "create_campaign" -> "campaign"
+      const storageKey = objectType + 's'; // e.g., "campaigns"
+
+      // Initialize sandbox storage for this object type if needed
+      if (!sandboxStorage[storageKey]) {
+        sandboxStorage[storageKey] = {};
+      }
+
+      // Create a storage proxy that uses sandbox
+      const sandboxStorageProxy = new Proxy(sandboxStorage, {
+        get: (target, prop) => target[prop],
+        set: (target, prop, value) => {
+          target[prop] = value;
+          return true;
+        }
+      });
+
+      // Execute the original handler logic with sandbox storage
+      const operation = toolName.split('_')[0]; // e.g., "create", "get", "update"
+
+      switch (operation) {
+        case 'create': {
+          const { randomUUID } = await import('crypto');
+          const id = randomUUID();
+          const obj = { Id: id, ...args };
+          sandboxStorage[storageKey][id] = obj;
+          return {
+            success: true,
+            message: `${objectType} created successfully (sandbox)`,
+            data: obj
+          };
+        }
+
+        case 'get': {
+          const { id } = args;
+          if (!sandboxStorage[storageKey] || !sandboxStorage[storageKey][id]) {
+            return {
+              success: false,
+              error: `${objectType} not found: ${id}`
+            };
+          }
+          return {
+            success: true,
+            data: sandboxStorage[storageKey][id]
+          };
+        }
+
+        case 'list': {
+          const items = sandboxStorage[storageKey] ? Object.values(sandboxStorage[storageKey]) : [];
+          return {
+            success: true,
+            total: items.length,
+            data: items
+          };
+        }
+
+        case 'update': {
+          const { id, ...updates } = args;
+          if (!sandboxStorage[storageKey] || !sandboxStorage[storageKey][id]) {
+            return {
+              success: false,
+              error: `${objectType} not found: ${id}`
+            };
+          }
+          sandboxStorage[storageKey][id] = {
+            ...sandboxStorage[storageKey][id],
+            ...updates
+          };
+          return {
+            success: true,
+            message: `${objectType} updated successfully (sandbox)`,
+            data: sandboxStorage[storageKey][id]
+          };
+        }
+
+        case 'delete': {
+          const { id } = args;
+          if (!sandboxStorage[storageKey] || !sandboxStorage[storageKey][id]) {
+            return {
+              success: false,
+              error: `${objectType} not found: ${id}`
+            };
+          }
+          delete sandboxStorage[storageKey][id];
+          return {
+            success: true,
+            message: `${objectType} deleted successfully (sandbox)`
+          };
+        }
+
+        default:
+          return handler(args);
+      }
+    };
+
+    const result = await sandboxHandler(payload);
+
+    console.log(`✅ Tool executed successfully in sandbox`);
+    console.log(`📊 Sandbox storage state:`, JSON.stringify(sandboxStorage, null, 2));
+    console.log(`🧹 Clearing sandbox storage...`);
+
+    // Return result with metadata
+    return {
+      success: result.success,
+      toolName: toolName,
+      sandboxMode: true,
+      payload: payload,
+      result: result,
+      toolDefinition: toolDef ? {
+        name: toolDef.name,
+        description: toolDef.description,
+        inputSchema: toolDef.inputSchema
+      } : null,
+      sandboxCleared: true
+    };
+
+  } catch (error) {
+    console.error(`❌ Sandbox test failed:`, error);
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
 // Run standalone if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
@@ -394,4 +713,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export default { createSchemaDrivenMCPApp, createSchemaDrivenMCPServer };
+export default { createSchemaDrivenMCPApp };

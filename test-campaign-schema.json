@@ -1,0 +1,65 @@
+{
+  "name": "campaign-management-mcp",
+  "version": "1.0.0",
+  "description": "Campaign Management MCP Server with 2 object types (Campaign and Budget)",
+  "tools": [],
+  "resources": [],
+  "schemas": {
+    "Campaign": {
+      "type": "object",
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique campaign identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Campaign name"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "active", "paused", "completed"],
+          "description": "Campaign status"
+        },
+        "budget": {
+          "type": "number",
+          "description": "Campaign budget in USD"
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Campaign start date"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Campaign end date"
+        }
+      }
+    },
+    "Budget": {
+      "type": "object",
+      "required": ["id", "amount", "currency"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique budget identifier"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Budget amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (e.g., USD, EUR)"
+        },
+        "period": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "total"],
+          "description": "Budget period"
+        }
+      }
+    }
+  }
+}
