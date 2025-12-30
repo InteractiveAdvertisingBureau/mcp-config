@@ -12,6 +12,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Trust proxy headers for proper protocol detection behind load balancers/proxies
+app.set('trust proxy', true);
+
 // Configure CORS with environment-based whitelist
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
@@ -178,6 +181,12 @@ app.post('/api/schema/register', async (req, res) => {
     // Get the actual tools from the reloaded server
     const actualTools = reloadResult.toolDefinitions || [];
 
+    // Build dynamic MCP server URL based on request
+    // Check X-Forwarded-Proto header for proper protocol detection behind proxies
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host');
+    const mcpServerUrl = `${protocol}://${host}/schema/mcp/sse`;
+
     res.json({
       success: true,
       message: 'Schema registered and loaded successfully',
@@ -189,7 +198,7 @@ app.post('/api/schema/register', async (req, res) => {
         resourcesCount: schema.resources?.length || 0
       },
       tools: actualTools,  // Return actual generated tools
-      mcpServerUrl: 'http://localhost:3000/schema/mcp/sse'  // Include server URL
+      mcpServerUrl: mcpServerUrl  // Dynamic URL based on current host
     });
   } catch (error) {
     res.status(500).json({
