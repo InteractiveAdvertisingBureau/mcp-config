@@ -427,6 +427,66 @@ app.post('/api/mcp/get-tools', async (req, res) => {
   }
 });
 
+// Call MCP tool endpoint
+app.post('/api/mcp/call-tool', async (req, res) => {
+  try {
+    const { serverUrl, toolName, parameters } = req.body;
+
+    if (!serverUrl || !toolName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Server URL and tool name are required'
+      });
+    }
+
+    const response = await axios.post(serverUrl, {
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: parameters || {}
+      }
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+      },
+      timeout: 30000 // 30 second timeout for tool execution
+    });
+
+    // Parse response
+    let result = response.data;
+    if (typeof result === 'string' && result.includes('event: message')) {
+      const lines = result.split('\n');
+      const dataLine = lines.find(l => l.startsWith('data: '));
+      if (dataLine) {
+        result = JSON.parse(dataLine.replace('data: ', ''));
+      }
+    }
+
+    // Check for error in result
+    if (result.error) {
+      return res.status(400).json({
+        success: false,
+        error: result.error.message || 'Tool execution failed',
+        errorCode: result.error.code
+      });
+    }
+
+    res.json({
+      success: true,
+      result: result.result
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Catch-all route for SPA (must be AFTER API/MCP routes)
 app.get(/^\/(?!api|mcp|chat).*/, function (req, res) {
   res.sendFile(path.join(__dirname, 'client/ui', 'index.html'));
