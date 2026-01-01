@@ -88,7 +88,9 @@
                 </button>
                 <button class="tab" data-tab="sample-flow">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                        </path>
                         <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
                         <line x1="12" y1="22.08" x2="12" y2="12"></line>
                     </svg>
@@ -113,7 +115,8 @@
                         <!-- Current Schema Info -->
                         <div id="currentSchemaInfo" class="alert alert-info" style="margin-bottom: 1.5rem;">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc"
+                                    stroke-width="2">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <line x1="12" y1="16" x2="12" y2="12"></line>
                                     <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -151,7 +154,8 @@
                             <!-- File Upload -->
                             <div id="fileUploadSection" class="form-group">
                                 <label for="schemaFile">Upload Schema JSON File</label>
-                                <input type="file" id="schemaFile" accept=".json" style="display: block; margin-bottom: 0.5rem;">
+                                <input type="file" id="schemaFile" accept=".json"
+                                    style="display: block; margin-bottom: 0.5rem;">
                                 <small>Upload a valid OpenDirect MCP schema JSON file</small>
                             </div>
 
@@ -166,15 +170,18 @@
                             <div id="githubUrlSection" class="form-group" style="display: none;">
                                 <label for="schemaGithubUrl">GitHub File URL</label>
                                 <input type="url" id="schemaGithubUrl"
-                                       placeholder="https://github.com/user/repo/blob/main/schema.json">
-                                <small>Example: https://github.com/anthonykatsur/AgenticDirect/blob/main/opendirect-mcp-server.json</small>
+                                    placeholder="https://github.com/user/repo/blob/main/schema.json">
+                                <small>Example:
+                                    https://github.com/anthonykatsur/AgenticDirect/blob/main/opendirect-mcp-server.json</small>
                             </div>
 
                             <!-- Schema Preview -->
                             <div id="schemaPreview" class="form-group" style="display: none; margin-top: 1.5rem;">
                                 <label>Schema Preview</label>
-                                <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; max-height: 300px; overflow-y: auto;">
-                                    <pre id="schemaPreviewContent" style="margin: 0; font-size: 0.875rem; white-space: pre-wrap;"></pre>
+                                <div
+                                    style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; max-height: 300px; overflow-y: auto;">
+                                    <pre id="schemaPreviewContent"
+                                        style="margin: 0; font-size: 0.875rem; white-space: pre-wrap;"></pre>
                                 </div>
                                 <div style="margin-top: 0.5rem; font-size: 0.875rem; color: #666;">
                                     <strong>Detected:</strong>
@@ -198,7 +205,8 @@
                                 </button>
                                 <button type="submit" class="btn btn-primary" id="registerSchemaBtn" disabled>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
                                         <polyline points="17 21 17 13 7 13 7 21"></polyline>
                                         <polyline points="7 3 7 8 15 8"></polyline>
                                     </svg>
@@ -228,9 +236,11 @@
                     </div>
                     <div class="card-body">
                         <!-- Current Connection Status -->
-                        <div id="mcpConnectionStatus" class="alert alert-info" style="margin-bottom: 1.5rem; display: none;">
+                        <div id="mcpConnectionStatus" class="alert alert-info"
+                            style="margin-bottom: 1.5rem; display: none;">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc"
+                                    stroke-width="2">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <polyline points="12 6 12 12 16 14"></polyline>
                                 </svg>
@@ -239,7 +249,8 @@
                             <div id="mcpConnectionDetails" style="margin-left: 1.75rem;">
                                 <div>URL: <span id="connectedMcpUrl">-</span></div>
                                 <div>Tools Available: <span id="connectedToolsCount">0</span></div>
-                                <div>Status: <span id="connectedStatus" style="color: #22c55e; font-weight: 600;">Connected</span></div>
+                                <div>Status: <span id="connectedStatus"
+                                        style="color: #22c55e; font-weight: 600;">Connected</span></div>
                             </div>
                         </div>
 
@@ -247,21 +258,23 @@
                         <form id="mcpConnectorForm">
                             <div class="form-group">
                                 <label for="mcpServerUrl">MCP Server URL</label>
-                                <input type="url" id="mcpServerUrl"
-                                       placeholder="">
+                                <input type="url" id="mcpServerUrl" placeholder="">
                                 <small>Enter the SSE endpoint URL of your MCP server</small>
                             </div>
 
                             <div class="form-group">
                                 <label>Quick Connect Options</label>
                                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="setMcpUrl('/mcp/sse')">
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                        onclick="setMcpUrl('/mcp/sse')">
                                         API Testing MCP
                                     </button>
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="setMcpUrl('/agenticdirect/mcp/sse')">
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                        onclick="setMcpUrl('/agenticdirect/mcp/sse')">
                                         AgenticDirect MCP
                                     </button>
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="setMcpUrl('/schema/mcp/sse')">
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                        onclick="setMcpUrl('/schema/mcp/sse')">
                                         Schema-Driven MCP
                                     </button>
                                 </div>
@@ -276,12 +289,15 @@
                                     </svg>
                                     Connect & Validate
                                 </button>
-                                <button type="button" class="btn btn-secondary" id="mcpDisconnectBtn" style="display: none;">
+                                <button type="button" class="btn btn-secondary" id="mcpDisconnectBtn"
+                                    style="display: none;">
                                     Disconnect
                                 </button>
-                                <button type="button" class="btn btn-secondary" id="mcpRefreshToolsBtn" style="display: none;">
+                                <button type="button" class="btn btn-secondary" id="mcpRefreshToolsBtn"
+                                    style="display: none;">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                                        <path
+                                            d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
                                     </svg>
                                     Refresh Tools
                                 </button>
@@ -289,19 +305,25 @@
                         </form>
 
                         <!-- MCP Tools List -->
-                        <div id="mcpToolsSection" style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div id="mcpToolsSection"
+                            style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                 <h3>Available Tools</h3>
-                                <span id="mcpToolsCount" style="background: #0066cc; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem; font-weight: 600;">0 tools</span>
+                                <span id="mcpToolsCount"
+                                    style="background: #0066cc; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem; font-weight: 600;">0
+                                    tools</span>
                             </div>
 
                             <!-- Search/Filter -->
                             <div class="form-group">
-                                <input type="text" id="mcpToolsSearch" placeholder="Search tools..." style="margin-bottom: 1rem;">
+                                <input type="text" id="mcpToolsSearch" placeholder="Search tools..."
+                                    style="margin-bottom: 1rem;">
                             </div>
 
                             <!-- Tools Grid -->
-                            <div id="mcpToolsList" style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+                            <div id="mcpToolsList"
+                                style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
                                 <!-- Tool cards will be added here -->
                             </div>
 
@@ -311,9 +333,11 @@
                         </div>
 
                         <!-- Connection Log -->
-                        <div id="mcpConnectionLog" style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+                        <div id="mcpConnectionLog"
+                            style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
                             <h3 style="margin-bottom: 1rem;">Connection Log</h3>
-                            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.875rem;">
+                            <div
+                                style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.875rem;">
                                 <div id="mcpLogContent"></div>
                             </div>
                         </div>
@@ -330,22 +354,26 @@
                         <!-- Info Banner -->
                         <div class="alert alert-info" style="margin-bottom: 1.5rem;">
                             <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc"
+                                    stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <line x1="12" y1="16" x2="12" y2="12"></line>
                                     <line x1="12" y1="8" x2="12.01" y2="8"></line>
                                 </svg>
                                 <div>
-                                    <strong>Sandbox Mode:</strong> Tests execute against real MCP server but use isolated storage.
+                                    <strong>Sandbox Mode:</strong> Tests execute against real MCP server but use
+                                    isolated storage.
                                     All test data is cleared after execution, keeping main storage clean.
                                 </div>
                             </div>
                         </div>
 
                         <!-- MCP Server Source Info -->
-                        <div id="testToolServerInfo" class="alert alert-info" style="margin-bottom: 1.5rem; display: none;">
+                        <div id="testToolServerInfo" class="alert alert-info"
+                            style="margin-bottom: 1.5rem; display: none;">
                             <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc"
+                                    stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <polyline points="12 6 12 12 16 14"></polyline>
                                 </svg>
@@ -366,7 +394,8 @@
                         </div>
 
                         <!-- Tool Description -->
-                        <div id="testToolDescription" style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #0066cc;">
+                        <div id="testToolDescription"
+                            style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #0066cc;">
                             <strong>Tool:</strong> <span id="testToolName">-</span><br>
                             <strong>Description:</strong> <span id="testToolDesc">-</span><br>
                             <strong>Required Fields:</strong> <span id="testToolRequired">-</span>
@@ -375,17 +404,14 @@
                         <!-- JSON Payload Input -->
                         <div class="form-group" style="margin-top: 1.5rem;">
                             <label for="testToolPayload">JSON Payload</label>
-                            <textarea id="testToolPayload"
-                                      placeholder='Enter JSON payload for the selected tool, e.g.:
+                            <textarea id="testToolPayload" placeholder='Enter JSON payload for the selected tool, e.g.:
 {
   "name": "Summer Sale Campaign",
   "status": "draft",
   "budget": 50000,
   "startDate": "2025-07-01",
   "endDate": "2025-08-31"
-}'
-                                      style="min-height: 200px; font-family: 'Courier New', monospace; font-size: 0.9rem;"
-                                      disabled></textarea>
+}' style="min-height: 200px; font-family: 'Courier New', monospace; font-size: 0.9rem;" disabled></textarea>
                             <small>Enter the input parameters as JSON object</small>
                         </div>
 
@@ -406,13 +432,15 @@
                         </div>
 
                         <!-- Test Results -->
-                        <div id="testToolResults" style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+                        <div id="testToolResults"
+                            style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
                             <h3 style="margin-bottom: 1rem;">Test Results</h3>
                             <div id="testToolResultsContent"></div>
                         </div>
 
                         <!-- Test History -->
-                        <div id="testToolHistory" style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+                        <div id="testToolHistory"
+                            style="display: none; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
                             <h3 style="margin-bottom: 1rem;">Recent Tests</h3>
                             <div id="testToolHistoryContent" style="max-height: 300px; overflow-y: auto;">
                                 <!-- History items will be added here -->
@@ -789,7 +817,8 @@
                                 <label for="flowMcpServer">MCP Server</label>
                                 <select id="flowMcpServer" class="form-control">
                                     <option value="">-- Select MCP Server --</option>
-                                    <option value="/agenticdirect/mcp/sse">Agentic Direct - OpenDirect Spec v2.1</option>
+                                    <option value="/agenticdirect/mcp/sse">Agentic Direct - OpenDirect Spec v2.1
+                                    </option>
                                     <option value="/mcp/sse">API Testing MCP</option>
                                     <option value="/schema/mcp/sse">Schema-Driven MCP</option>
                                 </select>
@@ -799,11 +828,13 @@
                             <div class="form-group">
                                 <label>Role</label>
                                 <div style="display: flex; gap: 1rem; align-items: center; height: 42px;">
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer;">
+                                    <label
+                                        style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer;">
                                         <input type="radio" name="flowRole" value="seller" id="flowRoleSeller">
                                         <span>Seller</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer;">
+                                    <label
+                                        style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer;">
                                         <input type="radio" name="flowRole" value="buyer" id="flowRoleBuyer" checked>
                                         <span>Buyer</span>
                                     </label>
@@ -812,9 +843,11 @@
                         </div>
 
                         <!-- Connection Status -->
-                        <div id="flowConnectionStatus" style="display: none; padding: 1rem; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; margin-bottom: 1rem;">
+                        <div id="flowConnectionStatus"
+                            style="display: none; padding: 1rem; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; margin-bottom: 1rem;">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9"
+                                    stroke-width="2">
                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                                 </svg>
@@ -847,18 +880,25 @@
                         </div>
                         <div class="card-body">
                             <!-- Tab Navigation -->
-                            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0;">
-                                <button type="button" class="flow-test-tab active" data-tab="individual" style="padding: 0.75rem 1.5rem; border: none; background: none; cursor: pointer; font-weight: 500; border-bottom: 3px solid #0066cc; color: #0066cc; transition: all 0.2s;">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 0.5rem;">
+                            <div
+                                style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0;">
+                                <button type="button" class="flow-test-tab active" data-tab="individual"
+                                    style="padding: 0.75rem 1.5rem; border: none; background: none; cursor: pointer; font-weight: 500; border-bottom: 3px solid #0066cc; color: #0066cc; transition: all 0.2s;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        style="vertical-align: middle; margin-right: 0.5rem;">
                                         <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
                                         <path d="M2 17l10 5 10-5"></path>
                                         <path d="M2 12l10 5 10-5"></path>
                                     </svg>
                                     Individual Tool Testing
                                 </button>
-                                <button type="button" class="flow-test-tab" data-tab="workflow" style="padding: 0.75rem 1.5rem; border: none; background: none; cursor: pointer; font-weight: 500; border-bottom: 3px solid transparent; color: #666; transition: all 0.2s;">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 0.5rem;">
-                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <button type="button" class="flow-test-tab" data-tab="workflow"
+                                    style="padding: 0.75rem 1.5rem; border: none; background: none; cursor: pointer; font-weight: 500; border-bottom: 3px solid transparent; color: #666; transition: all 0.2s;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        style="vertical-align: middle; margin-right: 0.5rem;">
+                                        <path
+                                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                                        </path>
                                         <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
                                         <line x1="12" y1="22.08" x2="12" y2="12"></line>
                                     </svg>
@@ -875,18 +915,21 @@
                                     </select>
                                 </div>
 
-                                <div id="flowToolDescription" style="display: none; padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1rem;">
+                                <div id="flowToolDescription"
+                                    style="display: none; padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1rem;">
                                     <strong>Description:</strong> <span id="flowToolDescText"></span>
                                 </div>
 
                                 <div class="form-group">
                                     <label for="flowToolPayload">Request Payload (JSON)</label>
-                                    <textarea id="flowToolPayload" class="form-control" rows="8" placeholder='{"key": "value"}'></textarea>
+                                    <textarea id="flowToolPayload" class="form-control" rows="8"
+                                        placeholder='{"key": "value"}'></textarea>
                                 </div>
 
                                 <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
                                     <button type="button" class="btn btn-primary" id="flowExecuteToolBtn">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor">
                                             <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                         </svg>
                                         Execute Tool
@@ -907,64 +950,76 @@
                             <!-- Workflow Testing Tab Content -->
                             <div id="flowWorkflowTab" class="flow-tab-content" style="display: none;">
                                 <div class="card-body" style="padding: 0;">
-                            <!-- Workflow Template Selection -->
-                            <div class="form-group">
-                                <label for="flowWorkflowTemplate">Workflow Template</label>
-                                <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem;">
-                                    <strong style="color: #0369a1;">ℹ️ Role-Based Templates:</strong>
-                                    <span style="color: #0c4a6e;">Templates are filtered based on your selected role above (Buyer/Seller)</span>
-                                </div>
-                                <select id="flowWorkflowTemplate" class="form-control">
-                                    <option value="">-- Select a template or create custom --</option>
-                                    <optgroup label="Buyer Workflows" id="flowBuyerTemplates">
-                                        <option value="buyer-simple">Buyer: Simple Order Flow (5 steps: Agency → Advertiser → Account → Order → Line)</option>
-                                        <option value="buyer-complete">Buyer: Complete Campaign (8 steps: + Search → Creative → Assignment)</option>
-                                        <option value="buyer-approval">Buyer: With Approval Flow (6 steps: + Status Update)</option>
-                                    </optgroup>
-                                    <optgroup label="Seller Workflows" id="flowSellerTemplates" style="display: none;">
-                                        <option value="seller-setup">Seller: Organization Setup (1 step: Create Publisher Org)</option>
-                                        <option value="seller-approval">Seller: Publisher Setup (1 step: Create Publisher Org)</option>
-                                    </optgroup>
-                                    <optgroup label="Custom">
-                                        <option value="custom">Custom Workflow (Build Your Own)</option>
-                                    </optgroup>
-                                </select>
-                            </div>
+                                    <!-- Workflow Template Selection -->
+                                    <div class="form-group">
+                                        <label for="flowWorkflowTemplate">Workflow Template</label>
+                                        <div
+                                            style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem;">
+                                            <strong style="color: #0369a1;">ℹ️ Role-Based Templates:</strong>
+                                            <span style="color: #0c4a6e;">Templates are filtered based on your selected
+                                                role above (Buyer/Seller)</span>
+                                        </div>
+                                        <select id="flowWorkflowTemplate" class="form-control">
+                                            <option value="">-- Select a template or create custom --</option>
+                                            <optgroup label="Buyer Workflows" id="flowBuyerTemplates">
+                                                <option value="buyer-simple">Buyer: Simple Order Flow (5 steps: Agency →
+                                                    Advertiser → Account → Order → Line)</option>
+                                                <option value="buyer-complete">Buyer: Complete Campaign (8 steps: +
+                                                    Search → Creative → Assignment)</option>
+                                                <option value="buyer-approval">Buyer: With Approval Flow (6 steps: +
+                                                    Status Update)</option>
+                                            </optgroup>
+                                            <optgroup label="Seller Workflows" id="flowSellerTemplates"
+                                                style="display: none;">
+                                                <option value="seller-setup">Seller: Organization Setup (1 step: Create
+                                                    Publisher Org)</option>
+                                                <option value="seller-approval">Seller: Publisher Setup (1 step: Create
+                                                    Publisher Org)</option>
+                                            </optgroup>
+                                            <optgroup label="Custom">
+                                                <option value="custom">Custom Workflow (Build Your Own)</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
 
-                            <!-- Custom Workflow Builder (shown when custom is selected) -->
-                            <div id="flowCustomWorkflow" style="display: none; margin-top: 1rem;">
-                                <h3>Custom Workflow Builder</h3>
-                                <div id="flowWorkflowSteps"></div>
-                                <button type="button" class="btn btn-secondary" id="flowAddStepBtn">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                                    </svg>
-                                    Add Step
-                                </button>
-                            </div>
+                                    <!-- Custom Workflow Builder (shown when custom is selected) -->
+                                    <div id="flowCustomWorkflow" style="display: none; margin-top: 1rem;">
+                                        <h3>Custom Workflow Builder</h3>
+                                        <div id="flowWorkflowSteps"></div>
+                                        <button type="button" class="btn btn-secondary" id="flowAddStepBtn">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                            Add Step
+                                        </button>
+                                    </div>
 
-                            <!-- Execute Workflow Button -->
-                            <button type="button" class="btn btn-primary" id="flowExecuteWorkflowBtn" style="margin-top: 1rem;" disabled>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                </svg>
-                                Execute Workflow
-                            </button>
+                                    <!-- Execute Workflow Button -->
+                                    <button type="button" class="btn btn-primary" id="flowExecuteWorkflowBtn"
+                                        style="margin-top: 1rem;" disabled>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                        Execute Workflow
+                                    </button>
 
-                            <!-- Visual Flow Diagram -->
-                            <div id="flowDiagram" style="display: none; margin-top: 2rem;">
-                                <h3>Workflow Execution</h3>
-                                <div id="flowDiagramContent" style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; min-height: 200px;">
-                                    <!-- Flow diagram will be rendered here -->
-                                </div>
-                            </div>
+                                    <!-- Visual Flow Diagram -->
+                                    <div id="flowDiagram" style="display: none; margin-top: 2rem;">
+                                        <h3>Workflow Execution</h3>
+                                        <div id="flowDiagramContent"
+                                            style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; min-height: 200px;">
+                                            <!-- Flow diagram will be rendered here -->
+                                        </div>
+                                    </div>
 
-                            <!-- Step-by-Step Results -->
-                            <div id="flowStepResults" style="display: none; margin-top: 2rem;">
-                                <h3>Step-by-Step Results</h3>
-                                <div id="flowStepResultsContent"></div>
-                            </div>
+                                    <!-- Step-by-Step Results -->
+                                    <div id="flowStepResults" style="display: none; margin-top: 2rem;">
+                                        <h3>Step-by-Step Results</h3>
+                                        <div id="flowStepResultsContent"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -69,8 +69,210 @@ app.use('/agenticdirect/mcp', agenticMcpApp);
 
 // Schema-Driven MCP server for OpenDirect v2.1 (33 auto-generated tools)
 // Note: Schema changes require server restart to take effect
+const schemaDrivenState = reloadSchemaDrivenServer();
 const schemaMcpApp = createSchemaDrivenMCPApp();
 app.use('/schema/mcp', schemaMcpApp);
+
+// ============================================
+// A2A (Agent-to-Agent) PROTOCOL INTEGRATION
+// Using official @a2a-js/sdk
+// ============================================
+import { createA2ASDKRouter } from './lib/a2a/sdkRouter.js';
+import { ClientAgent } from './lib/a2a/clientAgent.js';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client for AI-powered agents
+const openaiClient = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+if (openaiClient) {
+  console.log('✅ AI-powered agents initialized with OpenAI');
+} else {
+  console.log('⚠️  Agents running without AI (no OPENAI_API_KEY)');
+}
+
+// Get MCP tools and handlers from schema-driven server
+const buyerMcpTools = schemaDrivenState.toolDefinitions || [];
+const buyerMcpHandlers = schemaDrivenState.toolHandlersMap || new Map();
+
+// For now, use same tools for seller (in production, would use AgenticDirect)
+const sellerMcpTools = buyerMcpTools;
+const sellerMcpHandlers = buyerMcpHandlers;
+
+// Create A2A SDK-based endpoints for Buyer and Seller agents
+const buyerA2ARouter = createA2ASDKRouter('buyer', buyerMcpHandlers, buyerMcpTools, openaiClient);
+const sellerA2ARouter = createA2ASDKRouter('seller', sellerMcpHandlers, sellerMcpTools, openaiClient);
+
+app.use('/a2a/buyer', buyerA2ARouter);
+app.use('/a2a/seller', sellerA2ARouter);
+
+// Agent discovery endpoint
+app.get('/a2a/agents', (req, res) => {
+  const protocol = req.get('x-forwarded-proto') || req.protocol;
+  const host = req.get('host');
+  const baseUrl = `${protocol}://${host}`;
+
+  res.json({
+    agents: [
+      {
+        id: 'buyer-agent-opendirect',
+        role: 'buyer',
+        name: 'Buyer Agent',
+        cardUrl: `${baseUrl}/a2a/buyer/.well-known/agent-card.json`
+      },
+      {
+        id: 'seller-agent-opendirect',
+        role: 'seller',
+        name: 'Seller Agent',
+        cardUrl: `${baseUrl}/a2a/seller/.well-known/agent-card.json`
+      }
+    ]
+  });
+});
+
+// Initialize Client Agent with OpenAI for AI-powered orchestration
+// Default to autonomous mode, can be changed via API
+const openaiApiKey = process.env.OPENAI_API_KEY;
+const clientAgent = new ClientAgent('http://localhost:3000', openaiApiKey, 'autonomous');
+
+// Store progress events for each session
+const progressStore = new Map();
+
+// Listen for progress events from client agent
+clientAgent.on('progress', (progressData) => {
+  const { sessionId, ...progress } = progressData;
+
+  if (!progressStore.has(sessionId)) {
+    progressStore.set(sessionId, []);
+  }
+
+  progressStore.get(sessionId).push({
+    ...progress,
+    timestamp: new Date().toISOString()
+  });
+
+  console.log(`📊 Progress [${sessionId}]:`, progress.description);
+});
+
+// Client Agent Chat endpoint (similar to /chat but with A2A orchestration)
+app.post('/api/a2a/chat', async (req, res) => {
+  try {
+    const { sessionId, message, mode } = req.body;
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message is required'
+      });
+    }
+
+    // Support mode switching per request
+    if (mode && (mode === 'autonomous' || mode === 'orchestrated')) {
+      clientAgent.mode = mode;
+    }
+
+    // Clear previous progress for this session
+    const actualSessionId = sessionId || 'default';
+    progressStore.delete(actualSessionId);
+
+    // Initialize client agent if not already done
+    if (!clientAgent.agentRegistry.size) {
+      const protocol = req.get('x-forwarded-proto') || req.protocol;
+      const host = req.get('host');
+      clientAgent.baseUrl = `${protocol}://${host}`;
+      await clientAgent.initialize();
+    }
+
+    // Process message and orchestrate agents
+    const result = await clientAgent.processMessage(
+      actualSessionId,
+      message
+    );
+
+    // Include progress in response
+    const progress = progressStore.get(actualSessionId) || [];
+
+    res.json({
+      success: result.success,
+      message: result.summary,
+      details: result.details,
+      mode: clientAgent.mode,
+      progress: progress
+    });
+
+  } catch (error) {
+    console.error('❌ A2A Chat error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get conversation history
+app.get('/api/a2a/chat/:sessionId/history', (req, res) => {
+  const { sessionId } = req.params;
+  const history = clientAgent.getConversationHistory(sessionId);
+
+  res.json({
+    success: true,
+    history: history || { messages: [] }
+  });
+});
+
+// Clear conversation
+app.delete('/api/a2a/chat/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  clientAgent.clearConversation(sessionId);
+  progressStore.delete(sessionId);
+
+  res.json({
+    success: true,
+    message: 'Conversation cleared'
+  });
+});
+
+// Get progress for a session
+app.get('/api/a2a/chat/:sessionId/progress', (req, res) => {
+  const { sessionId } = req.params;
+  const progress = progressStore.get(sessionId) || [];
+
+  res.json({
+    success: true,
+    sessionId,
+    progress,
+    count: progress.length
+  });
+});
+
+// Set mode (autonomous or orchestrated)
+app.post('/api/a2a/mode', (req, res) => {
+  const { mode } = req.body;
+
+  if (!mode || (mode !== 'autonomous' && mode !== 'orchestrated')) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid mode. Must be "autonomous" or "orchestrated"'
+    });
+  }
+
+  clientAgent.mode = mode;
+
+  res.json({
+    success: true,
+    mode: clientAgent.mode
+  });
+});
+
+// Get current mode
+app.get('/api/a2a/mode', (req, res) => {
+  res.json({
+    success: true,
+    mode: clientAgent.mode,
+    useAI: clientAgent.useAI
+  });
+});
 
 // Mount REST API BEFORE catch-all route
 app.use('/api', mcpRoutes);
@@ -488,7 +690,7 @@ app.post('/api/mcp/call-tool', async (req, res) => {
 });
 
 // Catch-all route for SPA (must be AFTER API/MCP routes)
-app.get(/^\/(?!api|mcp|chat).*/, function (req, res) {
+app.get(/^\/(?!api|mcp|chat|a2a).*/, function (req, res) {
   res.sendFile(path.join(__dirname, 'client/ui', 'index.html'));
 })
 
