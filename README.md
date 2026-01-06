@@ -1343,6 +1343,7 @@ grep -r "create_account" lib/mcp/
 - **OpenDirect Spec**: https://www.iab.com/guidelines/opendirect/
 - **MCP Protocol**: https://modelcontextprotocol.io/
 - **JSON-RPC 2.0**: https://www.jsonrpc.org/specification
+- **IABTechLab MCP Server**: https://mcpclient.iabtechlab.com
 
 ---
 
