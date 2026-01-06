@@ -1,0 +1,108 @@
+{
+  "name": "test-custom-mcp-server",
+  "version": "1.0.0",
+  "description": "Test custom schema with 5 tools",
+  "tools": [
+    {
+      "name": "create_campaign",
+      "description": "Create a new advertising campaign",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Campaign name"
+          },
+          "budget": {
+            "type": "number",
+            "description": "Campaign budget"
+          }
+        },
+        "required": ["name", "budget"]
+      }
+    },
+    {
+      "name": "get_campaign",
+      "description": "Get campaign by ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Campaign ID"
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "list_campaigns",
+      "description": "List all campaigns",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum results"
+          }
+        }
+      }
+    },
+    {
+      "name": "update_campaign",
+      "description": "Update campaign",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Campaign ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "New campaign name"
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "delete_campaign",
+      "description": "Delete campaign",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Campaign ID"
+          }
+        },
+        "required": ["id"]
+      }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "custom://campaigns",
+      "name": "Campaigns",
+      "description": "All advertising campaigns",
+      "mimeType": "application/json"
+    }
+  ],
+  "schemas": {
+    "Custom.Campaign": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "budget": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

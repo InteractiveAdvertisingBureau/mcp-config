@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mcp-config": {
+      "command": "node",
+      "args": [
+        "/Users/sirajworkspace/Desktop/iabtechlab/crawlers/mcp-config/mcpServer.js"
+      ],
+      "env": {
+        "LLM_API_KEY": "${LLM_API_KEY}",
+        "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}"
+      }
+    }
+  }
+}

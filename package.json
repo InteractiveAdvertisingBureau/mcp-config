@@ -1,0 +1,45 @@
+{
+    "name": "mcp-config",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "scripts": {
+        "test": "node test-mcp-connection.js",
+        "start": "node server.js",
+        "mcp": "node mcpServer.js",
+        "mcp:http": "node mcpServerHttp.js",
+        "mcp:agentic": "node mcpServerAgentic.js",
+        "mcp:schema": "node mcpServerSchemaDriven.js",
+        "mcp:schema-stdio": "node mcpServerSchemaDrivenStdio.js",
+        "dev": "node --watch server.js",
+        "test:mcp": "node test-mcp-connection.js",
+        "setup-auth": "node setup-api-keys.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/InteractiveAdvertisingBureau/crawler-automation.git"
+    },
+    "keywords": [],
+    "author": "Siraj M",
+    "license": "ISC",
+    "type": "module",
+    "bugs": {
+        "url": "https://github.com/InteractiveAdvertisingBureau/crawler-automation/issues"
+    },
+    "homepage": "https://github.com/InteractiveAdvertisingBureau/crawler-automation#readme",
+    "dependencies": {
+        "@a2a-js/sdk": "^0.3.7",
+        "@anthropic-ai/sdk": "^0.71.2",
+        "@google/generative-ai": "^0.24.1",
+        "@modelcontextprotocol/sdk": "^1.24.3",
+        "axios": "^1.13.2",
+        "body-parser": "^2.2.0",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "morgan": "^1.10.1",
+        "mysql2": "^3.15.3",
+        "openai": "^6.8.1",
+        "zod": "^3.25.76"
+    }
+}

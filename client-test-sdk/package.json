@@ -1,0 +1,17 @@
+{
+  "name": "a2a-sdk-client-ui",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "HTML UI client using official @a2a-js/sdk",
+  "scripts": {
+    "build": "esbuild src/app.js --bundle --outfile=dist/bundle.js --format=esm",
+    "dev": "esbuild src/app.js --bundle --outfile=dist/bundle.js --format=esm --watch --servedir=. --serve=8081",
+    "serve": "python3 -m http.server 8081"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "^0.3.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}

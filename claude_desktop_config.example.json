@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agenticdirect": {
+      "command": "node",
+      "args": [
+        "/Users/sirajworkspace/Desktop/iabtechlab/crawlers/mcp-config/mcpServerAgentic.js"
+      ],
+      "env": {}
+    }
+  }
+}

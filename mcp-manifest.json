@@ -1,0 +1,89 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/manifest.json",
+  "name": "opendirect-mcp-server",
+  "version": "1.0.0",
+  "description": "OpenDirect 2.1 MCP Server - Reference implementation",
+  "author": "OpenDirect Validator Team",
+  "homepage": "http://localhost:5001",
+  "license": "MIT",
+  
+  "schemaRef": "./opendirect-mcp-schema.json",
+  
+  "implementations": {
+    "nodejs-stdio": {
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/sirajworkspace/Desktop/iabtechlab/crawlers/mcp-config/mcpServerAgentic.js"
+      ],
+      "env": {
+        "NODE_ENV": "production",
+        "STORAGE_MODE": "memory"
+      }
+    },
+
+    "nodejs-http": {
+      "transport": "http",
+      "url": "http://localhost:3000/agenticdirect/mcp",
+      "startCommand": {
+        "command": "npm",
+        "args": ["start"],
+        "cwd": "/Users/sirajworkspace/Desktop/iabtechlab/crawlers/mcp-config"
+      }
+    },
+
+    "nodejs-schema-driven": {
+      "transport": "http",
+      "url": "http://localhost:3000/agenticdirect/mcp",
+      "description": "Schema-driven MCP server with auto-generated CRUD tools",
+      "startCommand": {
+        "command": "node",
+        "args": [
+          "/Users/sirajworkspace/Desktop/iabtechlab/crawlers/mcp-config/mcpServerSchemaDriven.js"
+        ],
+        "cwd": "/Users/sirajworkspace/Desktop/iabtechlab/crawlers/mcp-config"
+      }
+    },
+
+    "python-stdio": {
+      "transport": "stdio",
+      "command": "/Users/mayankmishra/opendirect-mcp-server/venv/bin/python",
+      "args": [
+        "/Users/mayankmishra/opendirect-mcp-server/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/mayankmishra/opendirect-mcp-server",
+        "STORAGE_MODE": "memory"
+      }
+    },
+
+    "python-http": {
+      "transport": "http",
+      "url": "http://localhost:3000",
+      "startCommand": {
+        "command": "/Users/mayankmishra/opendirect-mcp-server/venv/bin/python",
+        "args": [
+          "/Users/mayankmishra/opendirect-mcp-server/http_server.py"
+        ],
+        "cwd": "/Users/mayankmishra/opendirect-mcp-server"
+      }
+    }
+  },
+
+  "defaultImplementation": "nodejs-http",
+  
+  "capabilities": {
+    "tools": true,
+    "resources": true,
+    "prompts": false,
+    "logging": true
+  },
+  
+  "metadata": {
+    "opendirect_version": "2.1",
+    "spec_compliance": "100%",
+    "protocol": "Model Context Protocol (MCP)",
+    "encoding": "json-rpc-2.0"
+  }
+}
+
