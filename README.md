@@ -890,20 +890,10 @@ After setup, verify:
 
 ---
 
-## 📄 License
+## 📚 Resources
 
-MIT License - See LICENSE file for details
-
----
-
-## 🙏 Acknowledgments
-
-- Built with [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/sdk)
-- A2A Protocol via [@a2a-js/sdk](https://github.com/Anthropic-AI/a2a-js)
-- OpenDirect v2.1 specification by [IAB Tech Lab](https://iabtechlab.com)
-
----
-
-**Questions?** Open an issue on [GitHub](https://github.com/InteractiveAdvertisingBureau/mcp-config/issues)
-
-**Documentation:** See `archive-legacy/docs/` for detailed migration guides and legacy documentation
+- **A2A Protocol**: [https://a2a-protocol.org/v0.3.0/specification/](https://a2a-protocol.org/v0.3.0/specification/)
+- **OpenDirect Spec**: [https://www.iab.com/guidelines/opendirect/](https://www.iab.com/guidelines/opendirect/)
+- **MCP Protocol**: [https://modelcontextprotocol.io/](https://modelcontextprotocol.io/)
+- **JSON-RPC 2.0**: [https://www.jsonrpc.org/specification](https://www.jsonrpc.org/specification)
+- **IABTechLab MCP Server**: [https://mcpclient.iabtechlab.com](https://mcpclient.iabtechlab.com)
