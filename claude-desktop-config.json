@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "api-testing-mcp": {
+      "url": "http://localhost:3000/mcp/sse",
+      "transport": "http"
+    },
+    "opendirect-mcp": {
+      "url": "http://localhost:3000/agenticdirect/mcp/sse",
+      "transport": "http"
+    },
+    "schema-driven-mcp": {
+      "url": "http://localhost:3000/schema/mcp/sse",
+      "transport": "http"
+    }
+  }
+}

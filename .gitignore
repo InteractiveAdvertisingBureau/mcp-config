@@ -1,30 +1,42 @@
+# Dependencies
 node_modules
+
+# Environment files
 .env
 .env.ai-chat
+
+# Service account keys
 tl-openx-qa-service-account-key.json
-screenshot_1.png
-screenshot_2.png
-screenshot_3.png
-Architecture.md
-AUTO_TESTING_FEATURE.md
-AI_DESCRIPTION_ENHANCEMENT.md
-AI_METADATA.md
-AI_AUTO_FILL_FEATURE.md
-AI_TEST_SCENARIO_GENERATION.md
-AI_ANALYSIS_GUIDE.MD
-UI_GUIDE.md
-TEST_RESULTS.md
-TEST_SCENARIO.md
-MCP_INTEGRATION.md
-INTELLIGENT_PATTERN_DETECTION.md
-CHAT_IMPLEMENTATION.md
-CONTEXT_AWARE_CHAT.md
-AI-CHAT-MULTI-PROVIDER.md
-AI-CHAT-QUICKSTART.md
-MCP-PROXY-REFACTORING.md
-CLIENTS-SUMMARY.md
-MCP_INTEGRATION_GUIDE.md
-CLAUDE_DESKTOP_SETUP.md
-AI-CHAT-SETUP.md
-.DS_Store
+*.pem
+*.key
+
+# Build output
 dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+.temp/
+
+# Old backup (not tracked in git)
+backup-r1/
+
+archive-legacy/
