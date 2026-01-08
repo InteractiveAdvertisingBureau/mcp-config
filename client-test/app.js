@@ -208,9 +208,22 @@ class A2AClient {
         if (task.history && task.history.length > 1) {
             const agentMessages = task.history.filter(h => h.role === 'agent');
             agentMessages.forEach(msg => {
-                const text = msg.parts?.[0]?.text || '';
+                // Extract text part
+                const textPart = msg.parts?.find(p => p.kind === 'text');
+                const text = textPart?.text || '';
+
+                // Extract data part
+                const dataPart = msg.parts?.find(p => p.kind === 'data');
+                const data = dataPart?.data;
+
                 if (text) {
                     this.addAgentMessage(text);
+                }
+
+                // Display data as formatted JSON if present
+                if (data) {
+                    const dataJson = JSON.stringify(data, null, 2);
+                    this.addAgentMessage(`<pre>${this.escapeHtml(dataJson)}</pre>`, true);
                 }
             });
         }
@@ -272,9 +285,22 @@ class A2AClient {
                     this.log('info', `Found ${newMessages.length} new agent messages`);
 
                     newMessages.forEach(msg => {
-                        const text = msg.parts?.[0]?.text || '';
+                        // Extract text part
+                        const textPart = msg.parts?.find(p => p.kind === 'text');
+                        const text = textPart?.text || '';
+
+                        // Extract data part
+                        const dataPart = msg.parts?.find(p => p.kind === 'data');
+                        const data = dataPart?.data;
+
                         if (text) {
                             this.addAgentMessage(text);
+                        }
+
+                        // Display data as formatted JSON if present
+                        if (data) {
+                            const dataJson = JSON.stringify(data, null, 2);
+                            this.addAgentMessage(`<pre>${this.escapeHtml(dataJson)}</pre>`, true);
                         }
                     });
 
@@ -335,22 +361,29 @@ class A2AClient {
         this.addMessage('user', '👤 You', text);
     }
 
-    addAgentMessage(text) {
-        this.addMessage('agent', '🤖 Agent', text);
+    addAgentMessage(text, allowHtml = false) {
+        this.addMessage('agent', '🤖 Agent', text, allowHtml);
     }
 
     addSystemMessage(text) {
         this.addMessage('system', '⚙️ System', text);
     }
 
-    addMessage(type, header, text) {
+    addMessage(type, header, text, allowHtml = false) {
         const messagesDiv = document.getElementById('chatMessages');
         const messageDiv = document.createElement('div');
         messageDiv.className = `message message-${type}`;
 
+        const content = allowHtml ? text : this.escapeHtml(text);
+
+        // Debug: log when HTML is allowed
+        if (allowHtml) {
+            console.log('Rendering HTML content:', text.substring(0, 50) + '...');
+        }
+
         messageDiv.innerHTML = `
             <div class="message-header">${header}</div>
-            <div class="message-content">${this.escapeHtml(text)}</div>
+            <div class="message-content">${content}</div>
         `;
 
         messagesDiv.appendChild(messageDiv);

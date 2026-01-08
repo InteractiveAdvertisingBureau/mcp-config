@@ -10,6 +10,7 @@ The **A2A (Agent-to-Agent) Protocol Module** implements the A2A Protocol v0.3.0 
 - 📋 **A2A Protocol v0.3.0** - Full spec compliance with agent cards
 - 🔄 **Multiple Transports** - JSON-RPC 2.0, HTTP+JSON, MCP tools
 - 🧠 **AI-Powered** - Natural language → tool mapping with OpenAI GPT
+- ⚡ **Multi-Step Workflows** - Intelligent chaining with `__PREVIOUS_RESULT_ID__`
 - 🎯 **Two Modes** - Autonomous (auto-routing) and Orchestrated (manual)
 - 💬 **Session Management** - Conversation history and context tracking
 - 📊 **Progress Tracking** - Real-time status updates and events
@@ -223,20 +224,101 @@ curl -X POST http://localhost:3000/api/a2a/chat \
 }
 ```
 
-### Example 2: Multi-Step Workflow
+### Example 2: Multi-Step Workflow (Advanced)
+
+The AgentExecutor now supports **intelligent multi-step workflows** where results from previous steps are automatically chained to subsequent steps using the `__PREVIOUS_RESULT_ID__` placeholder.
 
 ```bash
-curl -X POST http://localhost:3000/api/a2a/chat \
+# Request to create account AND order in one message
+curl -X POST http://localhost:3000/a2a/buyer/jsonrpc \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "create account for Adidas and create order with budget $50000"
+    "jsonrpc": "2.0",
+    "method": "sendMessage",
+    "params": {
+      "message": {
+        "messageId": "msg-001",
+        "role": "user",
+        "parts": [{
+          "kind": "text",
+          "text": "Create an account for Nike and then create an order for Nike with budget 50000"
+        }],
+        "kind": "message"
+      }
+    },
+    "id": 1
   }'
 ```
 
-The orchestrator automatically:
-1. Creates account → Returns `acc_456`
-2. Uses `acc_456` to create order
-3. Returns combined result
+**What happens internally:**
+
+1. **AI Planning** - OpenAI analyzes the message and creates a 2-step execution plan:
+```json
+{
+  "steps": [
+    {
+      "toolName": "create_account",
+      "toolParams": { "name": "Nike", "type": "advertiser" }
+    },
+    {
+      "toolName": "create_order",
+      "toolParams": {
+        "accountId": "__PREVIOUS_RESULT_ID__",
+        "name": "Nike",
+        "budget": 50000
+      }
+    }
+  ]
+}
+```
+
+2. **Step 1 Execution** - Creates account, returns `e6625eeb-23a7-46f3-89b5-d63fb5d75b3e`
+3. **Result Chaining** - Replaces `__PREVIOUS_RESULT_ID__` with actual account ID
+4. **Step 2 Execution** - Creates order with linked account ID
+5. **Progress Updates** - Publishes intermediate results after each step
+
+**Response (via getTask):**
+```json
+{
+  "task": {
+    "id": "task-123",
+    "status": { "state": "completed" },
+    "history": [
+      {
+        "role": "user",
+        "parts": [{"kind": "text", "text": "Create an account for Nike..."}]
+      },
+      {
+        "role": "agent",
+        "parts": [
+          {"kind": "text", "text": "Step 1/2: Successfully executed create_account"},
+          {"kind": "data", "data": {
+            "success": true,
+            "data": {"Id": "e6625eeb-23a7-46f3-89b5-d63fb5d75b3e", "name": "Nike"}
+          }}
+        ]
+      },
+      {
+        "role": "agent",
+        "parts": [
+          {"kind": "text", "text": "Step 2/2: Successfully executed create_order"},
+          {"kind": "data", "data": {
+            "success": true,
+            "data": {"Id": "0a906307-ab25-430b-b669-56d196ed1ba9", "accountid": "e6625eeb-23a7-46f3-89b5-d63fb5d75b3e"}
+          }}
+        ]
+      },
+      {
+        "role": "agent",
+        "parts": [
+          {"kind": "text", "text": "Successfully completed 2 steps:\n1. create_account\n2. create_order"},
+          {"kind": "data", "data": [/* both results */]}
+        ]
+      }
+    ]
+  }
+}
+```
 
 ### Example 3: Direct Agent Communication
 

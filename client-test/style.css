@@ -234,6 +234,18 @@ h3 {
     word-wrap: break-word;
 }
 
+.message-content pre {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+    overflow-x: auto;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
 .input-area {
     display: flex;
     gap: 10px;

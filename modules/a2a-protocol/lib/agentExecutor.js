@@ -1,17 +1,59 @@
 /**
- * Custom AgentExecutor for OpenDirect agents
- * Uses @a2a-js/sdk with existing OpenAI + MCP integration
+ * Advanced AgentExecutor for OpenDirect agents
+ * Migrated from a2a-agenticdirect-standalone with multi-step workflow support
+ * Uses @a2a-js/sdk with OpenAI + MCP integration
  */
 
 import OpenAI from 'openai';
-import { randomUUID } from 'crypto';
-import { loadPrompt } from './promptLoader.js';
+
+/**
+ * @typedef {Object} MCPTool
+ * @property {string} name
+ * @property {string} description
+ * @property {Object} inputSchema
+ * @property {string} inputSchema.type
+ * @property {Object} inputSchema.properties
+ * @property {string[]} [inputSchema.required]
+ */
+
+/**
+ * @typedef {Object} ExecutionStep
+ * @property {string} toolName
+ * @property {Object} toolParams
+ */
+
+/**
+ * @typedef {Object} ExecutionPlan
+ * @property {string} [toolName] - Single tool execution
+ * @property {Object} [toolParams] - Single tool parameters
+ * @property {ExecutionStep[]} [steps] - Multi-step execution
+ */
+
+/**
+ * @typedef {Object} RequestContext
+ * @property {Object} message - A2A message
+ * @property {string} contextId
+ * @property {string} taskId
+ * @property {Object} [metadata]
+ */
+
+/**
+ * @typedef {Object} EventBus
+ * @property {Function} publish - Publish message to event bus
+ * @property {Function} finished - Mark task as finished
+ */
 
 /**
  * OpenDirect Agent Executor
- * Implements AgentExecutor interface from @a2a-js/sdk
+ * Implements AgentExecutor interface from @a2a-js/sdk with multi-step workflow support
  */
 export class OpenDirectAgentExecutor {
+  /**
+   * @param {'buyer' | 'seller'} role
+   * @param {Map<string, Function>} mcpToolHandlers
+   * @param {MCPTool[]} mcpTools
+   * @param {OpenAI} openaiClient
+   */
   constructor(role, mcpToolHandlers, mcpTools, openaiClient) {
     this.role = role;
     this.mcpToolHandlers = mcpToolHandlers;
@@ -21,226 +63,217 @@ export class OpenDirectAgentExecutor {
   }
 
   /**
-   * Execute agent task
+   * Execute agent task with multi-step workflow support
    * @param {RequestContext} requestContext - A2A request context with message and metadata
-   * @param {ExecutionEventBus} eventBus - Event bus for publishing responses
+   * @param {EventBus} eventBus - Event bus for publishing responses
    */
   async execute(requestContext, eventBus) {
     const { message, contextId, taskId } = requestContext;
+    const userMessage = this.extractTextFromMessage(message);
 
-    console.log(`\n📨 A2A ${this.role} received message:`, message.parts[0]?.text);
+    console.log(`\n🤖 Agent Executor (${this.role}): Processing request`);
+    console.log(`📝 User message: ${userMessage}`);
 
     try {
-      // Extract message text
-      const messageText = message.parts[0]?.text || '';
-
-      // Determine if autonomous mode is requested
-      const autonomous = requestContext.metadata?.autonomous || false;
-      console.log(`   Mode: ${autonomous ? '🤖 Autonomous' : '🔧 Orchestrated'}`);
-
-      if (autonomous && this.useAI) {
-        // Autonomous mode: AI-powered planning and execution
-        await this.processAutonomousMode(messageText, eventBus);
-      } else {
-        // Orchestrated mode: Simple tool selection
-        await this.processOrchestratedMode(messageText, eventBus);
+      if (!this.useAI) {
+        // Fallback to simple pattern matching if no AI
+        await this.processWithoutAI(userMessage, eventBus, contextId, taskId);
+        eventBus.finished();
+        return;
       }
 
-      // Mark as finished
+      // Step 1: Select appropriate tools using AI
+      const planResponse = await this.selectToolsWithAI(userMessage);
+
+      // Check if multi-step or single-step
+      const steps = planResponse.steps || [{
+        toolName: planResponse.toolName,
+        toolParams: planResponse.toolParams
+      }];
+
+      console.log(`📊 Execution plan: ${steps.length} step(s)`);
+
+      const results = [];
+      let previousResult = null;
+
+      // Execute each step sequentially
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        console.log(`\n🔧 Step ${i + 1}/${steps.length}: ${step.toolName}`);
+
+        // Replace placeholders with actual results from previous steps
+        let params = { ...step.toolParams };
+        if (previousResult && previousResult.id) {
+          // Replace "__PREVIOUS_RESULT_ID__" placeholder with actual ID
+          for (const key in params) {
+            if (params[key] === '__PREVIOUS_RESULT_ID__') {
+              params[key] = previousResult.id;
+              console.log(`🔗 Linked ${key} to previous result ID: ${previousResult.id}`);
+            }
+          }
+        }
+
+        console.log(`📋 Parameters:`, JSON.stringify(params, null, 2));
+
+        // Execute the tool
+        const result = await this.executeTool(step.toolName, params);
+        results.push({ tool: step.toolName, result });
+        previousResult = result;
+
+        console.log(`✅ Step ${i + 1} completed`);
+
+        // Publish intermediate result for multi-step
+        if (steps.length > 1) {
+          const stepMessage = this.createAgentMessage(
+            `Step ${i + 1}/${steps.length}: Successfully executed ${step.toolName}`,
+            result,
+            contextId,
+            taskId
+          );
+          eventBus.publish(stepMessage);
+        }
+      }
+
+      console.log(`\n✅ All ${steps.length} step(s) completed successfully`);
+
+      // Step 3: Publish final summary
+      const summary = steps.length > 1
+        ? `Successfully completed ${steps.length} steps:\n${steps.map((s, i) => `${i + 1}. ${s.toolName}`).join('\n')}`
+        : `Successfully executed ${steps[0].toolName}`;
+
+      const finalMessage = this.createAgentMessage(
+        summary,
+        steps.length === 1 ? results[0].result : results,
+        contextId,
+        taskId
+      );
+
+      eventBus.publish(finalMessage);
       eventBus.finished();
 
     } catch (error) {
-      console.error(`❌ ${this.role} agent execution failed:`, error);
+      console.error(`❌ Execution failed:`, error);
 
       // Publish error message
-      eventBus.publish({
-        messageId: randomUUID(),
-        role: 'agent',
-        parts: [{
-          kind: 'text',
-          text: `Error: ${error.message}`
-        }],
-        kind: 'message'
-      });
+      const errorMessage = this.createAgentMessage(
+        `Error: ${error.message}`,
+        null,
+        contextId,
+        taskId
+      );
 
+      eventBus.publish(errorMessage);
       eventBus.finished();
     }
   }
 
   /**
-   * Process in orchestrated mode (simple tool selection)
+   * Select tools using AI (supports multi-step workflows)
+   * @param {string} userMessage
+   * @returns {Promise<ExecutionPlan>}
    */
-  async processOrchestratedMode(messageText, eventBus) {
-    console.log(`🔧 Orchestrated mode: selecting best tool`);
-
-    if (!this.useAI) {
-      // Pattern matching fallback
-      const selectedTool = this.selectToolByPattern(messageText);
-      await this.executeTool(selectedTool, messageText, eventBus);
-      return;
-    }
-
-    // Use OpenAI to select tool
-    const toolDescriptions = this.mcpTools.map(t =>
-      `${t.name}: ${t.description}`
-    ).join('\n');
-
-    const response = await this.openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a ${this.role} agent. Select the best tool for the request.\n\nAvailable tools:\n${toolDescriptions}\n\nRespond with only the tool name.`
-        },
-        {
-          role: 'user',
-          content: messageText
-        }
-      ],
-      temperature: 0
-    });
-
-    const selectedToolName = response.choices[0].message.content.trim();
-    const selectedTool = this.mcpTools.find(t => t.name === selectedToolName);
-
-    if (selectedTool) {
-      await this.executeTool(selectedTool, messageText, eventBus);
-    } else {
-      eventBus.publish({
-        messageId: randomUUID(),
-        role: 'agent',
-        parts: [{
-          kind: 'text',
-          text: `Could not find appropriate tool for: "${messageText}"`
-        }],
-        kind: 'message'
-      });
-    }
-  }
-
-  /**
-   * Process in autonomous mode (AI-powered planning)
-   */
-  async processAutonomousMode(messageText, eventBus) {
-    console.log(`🤖 Autonomous mode: creating plan`);
-
-    const prompt = await loadPrompt(this.role, 'autonomous-planner');
-    const toolsContext = JSON.stringify(this.mcpTools.map(t => ({
+  async selectToolsWithAI(userMessage) {
+    const toolsWithSchemas = this.mcpTools.map(t => ({
       name: t.name,
       description: t.description,
-      parameters: t.inputSchema
-    })), null, 2);
+      parameters: t.inputSchema.properties || {}
+    }));
 
-    // Generate plan
-    const planResponse = await this.openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: prompt.replace('{{TOOLS}}', toolsContext)
-        },
-        {
-          role: 'user',
-          content: messageText
-        }
-      ],
-      temperature: 0
-    });
+    const systemPrompt = `You are an AI assistant for the OpenDirect ${this.role} agent.
+Your job is to analyze user requests and determine which tools to execute.
 
-    const planText = planResponse.choices[0].message.content;
+Available tools with their exact parameter names:
+${toolsWithSchemas.map(t => `
+- ${t.name}: ${t.description}
+  Parameters: ${JSON.stringify(t.parameters, null, 2)}
+`).join('\n')}
 
-    // Publish plan
-    eventBus.publish({
-      messageId: randomUUID(),
-      role: 'agent',
-      parts: [{
-        kind: 'text',
-        text: `📋 Plan:\n${planText}`
-      }],
-      kind: 'message'
-    });
+IMPORTANT RULES:
+1. Use the EXACT parameter names from the tool schemas above
+2. Use entity names EXACTLY as provided by the user (do NOT add suffixes like "Account" or "Order")
+3. For multi-step workflows that need results from previous steps, use the special placeholder: "__PREVIOUS_RESULT_ID__"
+4. You must respond with a valid JSON object
 
-    // Parse and execute plan steps
-    const steps = this.parsePlanSteps(planText);
-
-    for (const step of steps) {
-      const tool = this.mcpTools.find(t => t.name === step.tool);
-      if (tool) {
-        await this.executeTool(tool, messageText, eventBus, step.params);
-      }
+Example for "create account for Nike and create order for Nike with budget 500":
+{
+  "steps": [
+    {
+      "toolName": "create_account",
+      "toolParams": { "name": "Nike", "type": "advertiser" }
+    },
+    {
+      "toolName": "create_order",
+      "toolParams": { "accountId": "__PREVIOUS_RESULT_ID__", "name": "Nike", "budget": 500 }
     }
+  ]
+}
+
+If the request requires only ONE tool, respond with this JSON format:
+{
+  "toolName": "the_tool_to_use",
+  "toolParams": { "paramName": "value" }
+}
+
+Always return valid JSON.`;
+
+    const response = await this.openaiClient.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response from AI');
+    }
+
+    return JSON.parse(content);
   }
 
   /**
    * Execute a single MCP tool
+   * @param {string} toolName
+   * @param {Object} params
+   * @returns {Promise<any>}
    */
-  async executeTool(tool, messageText, eventBus, params = null) {
-    console.log(`🔧 Executing tool: ${tool.name}`);
-
-    const handler = this.mcpToolHandlers.get(tool.name);
+  async executeTool(toolName, params) {
+    const handler = this.mcpToolHandlers.get(toolName);
     if (!handler) {
-      console.error(`❌ Handler not found for tool: ${tool.name}`);
-      throw new Error(`Handler not found for tool: ${tool.name}`);
+      throw new Error(`Tool not found: ${toolName}`);
     }
 
-    try {
-      // Generate parameters if not provided
-      let toolParams = params;
-      if (!toolParams && this.useAI) {
-        console.log(`🤖 Generating parameters for ${tool.name}...`);
-        toolParams = await this.generateToolParams(tool, messageText);
-        console.log(`📝 Generated params:`, JSON.stringify(toolParams, null, 2));
-      }
-
-      // Execute tool
-      console.log(`⚙️  Calling handler for ${tool.name}...`);
-      const result = await handler(toolParams || {});
-      console.log(`✅ Tool ${tool.name} executed successfully`);
-
-      // Publish result
-      eventBus.publish({
-        messageId: randomUUID(),
-        role: 'agent',
-        parts: [{
-          kind: 'text',
-          text: `✅ ${tool.name} result:\n${JSON.stringify(result, null, 2)}`
-        }],
-        kind: 'message'
-      });
-    } catch (error) {
-      console.error(`❌ Tool execution failed for ${tool.name}:`, error);
-      throw error;
-    }
+    return await handler(params);
   }
 
   /**
-   * Generate tool parameters using AI
+   * Process without AI (pattern matching fallback)
    */
-  async generateToolParams(tool, messageText) {
-    const response = await this.openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Extract parameters for the tool "${tool.name}".\nSchema: ${JSON.stringify(tool.inputSchema)}\nRespond with only valid JSON.`
-        },
-        {
-          role: 'user',
-          content: messageText
-        }
-      ],
-      temperature: 0
-    });
+  async processWithoutAI(userMessage, eventBus, contextId, taskId) {
+    console.log(`🔧 Pattern matching mode (no AI available)`);
 
-    try {
-      return JSON.parse(response.choices[0].message.content);
-    } catch {
-      return {};
+    const selectedTool = this.selectToolByPattern(userMessage);
+    if (!selectedTool) {
+      throw new Error('No suitable tool found for request');
     }
+
+    const result = await this.executeTool(selectedTool.name, {});
+
+    const message = this.createAgentMessage(
+      `Executed ${selectedTool.name} (pattern matching)`,
+      result,
+      contextId,
+      taskId
+    );
+
+    eventBus.publish(message);
   }
 
   /**
-   * Select tool by pattern matching (fallback)
+   * Select tool by pattern matching (fallback when no AI)
    */
   selectToolByPattern(messageText) {
     const text = messageText.toLowerCase();
@@ -248,6 +281,9 @@ export class OpenDirectAgentExecutor {
     // Pattern matching based on keywords
     if (text.includes('create') && text.includes('order')) {
       return this.mcpTools.find(t => t.name === 'create_order');
+    }
+    if (text.includes('create') && text.includes('account')) {
+      return this.mcpTools.find(t => t.name === 'create_account');
     }
     if (text.includes('search') || text.includes('find')) {
       return this.mcpTools.find(t => t.name === 'search_products');
@@ -261,23 +297,39 @@ export class OpenDirectAgentExecutor {
   }
 
   /**
-   * Parse plan steps from AI response
+   * Extract text from A2A message
+   * @param {Object} message
+   * @returns {string}
    */
-  parsePlanSteps(planText) {
-    const steps = [];
-    const lines = planText.split('\n');
+  extractTextFromMessage(message) {
+    const textParts = message.parts.filter(p => p.kind === 'text');
+    return textParts.map(p => p.text).join(' ');
+  }
 
-    for (const line of lines) {
-      const match = line.match(/(?:Step \d+:|-)?\s*Use `(\w+)`/i);
-      if (match) {
-        steps.push({
-          tool: match[1],
-          params: null
-        });
-      }
+  /**
+   * Create agent message
+   * @param {string} text
+   * @param {any} data
+   * @param {string} contextId
+   * @param {string} taskId
+   * @returns {Object}
+   */
+  createAgentMessage(text, data, contextId, taskId) {
+    const parts = [{ kind: 'text', text }];
+
+    if (data) {
+      parts.push({ kind: 'data', data });
     }
 
-    return steps;
+    return {
+      messageId: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      role: 'agent',
+      parts,
+      kind: 'message',
+      contextId,
+      taskId,
+      timestamp: new Date().toISOString()
+    };
   }
 
   /**
